@@ -16,7 +16,7 @@ mDisplayString MACRO stringOffset:REQ
   call	WriteString
 ENDM
 
-mGetString	MACRO userStringOffset:REQ, userStringLength:REQ, invalidInputMsgOffset:REQ, promptOffset
+mGetString	MACRO userStringOffset:REQ, userStringLength:REQ, invalidInputMsgOffset:REQ, promptOffset, charsEnteredOffset
   LOCAL _getUserString, _gotValidInput
 
   ; preserve registers
@@ -35,7 +35,7 @@ mGetString	MACRO userStringOffset:REQ, userStringLength:REQ, invalidInputMsgOffs
   mov	EDX, userStringOffset
   mov	ECX, userStringLength
   call	ReadString
- ; mov	inputCharCount, EAX
+  mov	[charsEnteredOffset], EAX
 
   TODO1: ; call bool number validation proc inside this validation loop
 
@@ -78,6 +78,7 @@ userStringLen	DWORD	LENGTHOF userString															; length including null te
 invalidErrorMsg	BYTE	"ERROR: You did not enter a signed number or your number was too big.",10,13,0
 tryAgain		BYTE	"Please try again: ",0
 userInt			SDWORD	?																			; int value after conversion from string
+charsEntered	DWORD	?																			; how many characters the user entered
 
 youEntered		BYTE	"You entered the following numbers: ",10,13,0
 theSumIs		BYTE	"The sum of these numbers is: ",0
@@ -88,6 +89,7 @@ thanks			BYTE	"Thanks for playing! I had so much fun",0
 .code
 main PROC
   ; get valid number from user
+  push OFFSET charsEntered
   push OFFSET userInt
   push OFFSET prompt
   push OFFSET invalidErrorMsg
@@ -162,56 +164,74 @@ WriteVal ENDP
 ;	[ebp+12] = LENGTHOF userString
 ;	[ebp+16] = OFFSET invalidErrorMsg
 ;	[ebp+20] = OFFSET prompt
-;	[ebp+24] = OFFSET userInt
+;	[ebp+24] = OFFSET charsEntered
+;	[ebp+28] = OFFSET userInt
 ;
 ; Returns:
 ;	userInteger SDWORD = integer entered by user
 ; ---------------------------------------------------------------------------------
 ReadVal PROC
-  local temp:BYTE
+;  local temp:BYTE        ; this messes up the stack
 
   push	EBP
   mov	EBP, ESP
   push	EAX
   push	EBX
+  push	EDX
   push	ESI
 
   ; get user string and save to userString
-  mGetString [EBP+8] [EBP+12] [EBP+16] [EBP+20]
+  _getUserString:
+;  mGetString [EBP+8] [EBP+12] [EBP+16] [EBP+20] [EBP+24]			; TODO: this is preferred call but doesn't work
+  mGetString OFFSET userString, LENGTHOF userString, OFFSET invalidErrorMsg, OFFSET prompt, OFFSET charsEntered
   
-  ; TODO: how to access userString to assign to ESI?
-
   ; convert userString to SDWORD int
-  mov	ECX, [EBP+12]
+  mov	ECX, [EBP+24]   ; loop as many times as there are chars in what user entered
   mov	EBX, 0			; tracks finalInteger
-  mov	ESI, [EBP+8]		; TODO: see TODO above (how to access userString?)
+  mov	ESI, [EBP+8]
   cld
   _buildInt:
 ;  mov	ESI, [EBP+12]  ; ESI now contains OFFSET userString
   lodsb				   ; MOV AL, [ESI] then inc ESI
 
-  ; got an ascii value in AL. Convert it, append it, and loop to next char
+  ; got an ascii value in AL. 
+  ; VALIDATE: check if it's a +/- sign or a digit
+  ; TODO ************************************
+
+  ; if it's not valid, go all the way back to square 1 and _getUserString afresh
+
+
+  ; ascii value is for an integer. Convert it, append it, and loop to next char  
   ; using finalInteger = 10 * finalInteger + (asciiValue - 48)
     ; AL = asciiValue of next char of userString
     ; EBX = finalInteger
   ; EBX = EBX * 10 + (AL - 48)
   
   sub	AL, 48		    ; AL - 48
-  mov	temp, AL		; temp = AL
+;  mov	temp, AL		; temp = AL		TODO: make local temp
+  mov	DL, AL			;				TODO: delete after local temp
   
   push	EAX				; save EAX
   mov	EAX, 10
+  push	EDX				; preserve temp EDX for mul
   mul	EBX				; EBX = EBX * 10
+  pop	EDX				; restore EDX after mul
   pop	EAX				; restore EAX
 
-  add	EBX, DWORD PTR temp ; EBX = EBX + temp
-  
+;  add	EBX, DWORD PTR temp ; EBX = EBX + temp
+  push	EBX
+  movzx EBX, DL
+  mov   EDX, EBX				;		TODO: maybe delete after local temp
+  pop	EBX
+  add	EBX, EDX			;			TODO: delete after local temp
+
   loop _buildInt
 
-  ; save finalInteger
-  mov	[EBP+24], EAX
+  ; save finalInteger as userInt
+  mov	[EBP+28], EBX
 
   pop   ESI
+  pop	EDX
   pop	EBX
   pop	EAX
   pop	EBP
