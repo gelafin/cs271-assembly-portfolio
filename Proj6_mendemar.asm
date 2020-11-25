@@ -77,6 +77,7 @@ userString		BYTE	MAXSIZE DUP(?)
 userStringLen	DWORD	LENGTHOF userString															; length including null terminator
 invalidErrorMsg	BYTE	"ERROR: You did not enter a signed number or your number was too big.",10,13,0
 tryAgain		BYTE	"Please try again: ",0
+userInt			SDWORD	?																			; int value after conversion from string
 
 youEntered		BYTE	"You entered the following numbers: ",10,13,0
 theSumIs		BYTE	"The sum of these numbers is: ",0
@@ -87,6 +88,11 @@ thanks			BYTE	"Thanks for playing! I had so much fun",0
 .code
 main PROC
   ; get valid number from user
+  push OFFSET userInt
+  push OFFSET prompt
+  push OFFSET invalidErrorMsg
+  push userStringLen
+  push OFFSET userString
   call ReadVal
 
   ; convert DWORD integer to ASCII string and print
@@ -152,34 +158,64 @@ WriteVal ENDP
 ; Preconditions: 
 ;
 ; Receives:
-;   [ebp+8]  = integer to print (32 bits or fewer)
-;	[ebp+12] = OFFSET userString
-;	[ebp+16] = LENGTHOF userString
+;	[ebp+8]  = OFFSET userString
+;	[ebp+12] = LENGTHOF userString
+;	[ebp+16] = OFFSET invalidErrorMsg
+;	[ebp+20] = OFFSET prompt
+;	[ebp+24] = OFFSET userInt
+;
+; Returns:
+;	userInteger SDWORD = integer entered by user
 ; ---------------------------------------------------------------------------------
 ReadVal PROC
+  local temp:BYTE
+
   push	EBP
   mov	EBP, ESP
+  push	EAX
+  push	EBX
   push	ESI
 
   ; get user string and save to userString
-  mGetString OFFSET userString, userStringLen, OFFSET invalidErrorMsg, OFFSET prompt
+  mGetString [EBP+8] [EBP+12] [EBP+16] [EBP+20]
   
   ; TODO: how to access userString to assign to ESI?
 
   ; convert userString to SDWORD int
-  mov	ECX, [EBP+16]
-
-  _printInt:
-  ; get next digit of the string into AL
-  mov	ESI, [EBP+12]  ; ESI now contains OFFSET userString
+  mov	ECX, [EBP+12]
+  mov	EBX, 0			; tracks finalInteger
+  mov	ESI, [EBP+8]		; TODO: see TODO above (how to access userString?)
   cld
+  _buildInt:
+;  mov	ESI, [EBP+12]  ; ESI now contains OFFSET userString
   lodsb				   ; MOV AL, [ESI] then inc ESI
 
-  loop _printInt
+  ; got an ascii value in AL. Convert it, append it, and loop to next char
+  ; using finalInteger = 10 * finalInteger + (asciiValue - 48)
+    ; AL = asciiValue of next char of userString
+    ; EBX = finalInteger
+  ; EBX = EBX * 10 + (AL - 48)
+  
+  sub	AL, 48		    ; AL - 48
+  mov	temp, AL		; temp = AL
+  
+  push	EAX				; save EAX
+  mov	EAX, 10
+  mul	EBX				; EBX = EBX * 10
+  pop	EAX				; restore EAX
 
+  add	EBX, DWORD PTR temp ; EBX = EBX + temp
+  
+  loop _buildInt
+
+  ; save finalInteger
+  mov	[EBP+24], EAX
 
   pop   ESI
+  pop	EBX
+  pop	EAX
   pop	EBP
-  ret 4
+  ret	16
 ReadVal ENDP
+
 END main
