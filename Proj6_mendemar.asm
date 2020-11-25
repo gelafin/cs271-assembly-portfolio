@@ -171,7 +171,7 @@ WriteVal ENDP
 ;	userInteger SDWORD = integer entered by user
 ; ---------------------------------------------------------------------------------
 ReadVal PROC
-;  local temp:BYTE        ; this messes up the stack
+;  local temp
 
   push	EBP
   mov	EBP, ESP
@@ -182,24 +182,44 @@ ReadVal PROC
 
   ; get user string and save to userString
   _getUserString:
-;  mGetString [EBP+8] [EBP+12] [EBP+16] [EBP+20] [EBP+24]			; TODO: this is preferred call but doesn't work
-  mGetString OFFSET userString, LENGTHOF userString, OFFSET invalidErrorMsg, OFFSET prompt, OFFSET charsEntered
+  mGetString [EBP+8], [EBP+12], [EBP+16], [EBP+20], [EBP+24]
   
   ; convert userString to SDWORD int
   mov	ECX, [EBP+24]   ; loop as many times as there are chars in what user entered
   mov	EBX, 0			; tracks finalInteger
-  mov	ESI, [EBP+8]
-  cld
+  mov	ESI, [EBP+8]	; ESI = OFFSET userString
+  cld					; starting from the msb
+  lodsb					; MOV AL, [ESI]
+
+  ; got the first ascii value in AL. 
+  ; VALIDATE: check if the first char is a +/- sign
+  cmp	AL, 43			; is it a + sign?
+  je	_buildInt		; skip to next char. + sign is redundant
+
+  cmp	AL, 45			; is it a - sign?
+  ; TODO******			; the value is negative. Final step will be to convert from positive to negative by 0 - value
+  ; great place for a local var. Just need a bool isNegative
+
+  ; convert the rest of the string to number form
   _buildInt:
-;  mov	ESI, [EBP+12]  ; ESI now contains OFFSET userString
-  lodsb				   ; MOV AL, [ESI] then inc ESI
+  ; first char already loaded into AL for first iteration
 
-  ; got an ascii value in AL. 
-  ; VALIDATE: check if it's a +/- sign or a digit
-  ; TODO ************************************
+  ; VALIDATE: is it a number (between 48-57 in ASCII)?
+  cmp	AL, 48			; is it less than 48?
+  jl	_invalidInput
 
-  ; if it's not valid, go all the way back to square 1 and _getUserString afresh
+  cmp	AL, 57			; is it more than 57?
+  jg	_invalidInput
 
+  jmp _validInput		; passed validation. Char is a number's ASCII code
+
+  _invalidInput:
+  mov	EDX, [EBP+16]	; print invalid error message
+  call	WriteString
+  jmp	_getUserString  ; go all the way back to square 1 and _getUserString afresh
+
+  _validInput:
+  ; TODO: make this loop into a helper function convertAsciiToInt
 
   ; ascii value is for an integer. Convert it, append it, and loop to next char  
   ; using finalInteger = 10 * finalInteger + (asciiValue - 48)
@@ -207,9 +227,9 @@ ReadVal PROC
     ; EBX = finalInteger
   ; EBX = EBX * 10 + (AL - 48)
   
-  sub	AL, 48		    ; AL - 48
-;  mov	temp, AL		; temp = AL		TODO: make local temp
-  mov	DL, AL			;				TODO: delete after local temp
+  sub	AL, 48		    ; AL - 48 (aka, nextDigit to add)
+;  mov	temp, AL		; temp = AL		TODO: make local nextDigit
+  mov	DL, AL			;				TODO: delete after local nextDigit
   
   push	EAX				; save EAX
   mov	EAX, 10
@@ -221,9 +241,13 @@ ReadVal PROC
 ;  add	EBX, DWORD PTR temp ; EBX = EBX + temp
   push	EBX
   movzx EBX, DL
-  mov   EDX, EBX				;		TODO: maybe delete after local temp
+  mov   EDX, EBX		;				TODO: maybe delete after local nextDigit
   pop	EBX
-  add	EBX, EDX			;			TODO: delete after local temp
+  add	EBX, EDX		;				TODO: delete after local nextDigit
+
+  ; maintain loop
+  cld					; iterate left to right
+  lodsb				    ; MOV AL, [ESI] then inc ESI
 
   loop _buildInt
 
