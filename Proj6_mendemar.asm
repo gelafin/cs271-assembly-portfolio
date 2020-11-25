@@ -168,7 +168,7 @@ WriteVal ENDP
 ;	[ebp+28] = OFFSET userInt
 ;
 ; Returns:
-;	userInteger SDWORD = integer entered by user
+;	userInt SDWORD = integer entered by user
 ; ---------------------------------------------------------------------------------
 ReadVal PROC
 ;  local temp
@@ -194,8 +194,15 @@ ReadVal PROC
   ; got the first ascii value in AL. 
   ; VALIDATE: check if the first char is a +/- sign
   cmp	AL, 43			; is it a + sign?
-  je	_buildInt		; skip to next char. + sign is redundant
+  jne	_isNotPlusSign
 
+  ; it is a plus sign. Skip to next char, since + sign is redundant
+  cld
+  lodsb
+  dec	ECX				; loop 1 time fewer, because first char's check is complete
+  jmp	_buildInt		
+
+  _isNotPlusSign:
   cmp	AL, 45			; is it a - sign?
   ; TODO******			; the value is negative. Final step will be to convert from positive to negative by 0 - value
   ; great place for a local var. Just need a bool isNegative
@@ -234,7 +241,8 @@ ReadVal PROC
   push	EAX				; save EAX
   mov	EAX, 10
   push	EDX				; preserve temp EDX for mul
-  mul	EBX				; EBX = EBX * 10
+  mul	EBX				; EAX = EBX * 10
+  mov	EBX, EAX		; EBX = EAX
   pop	EDX				; restore EDX after mul
   pop	EAX				; restore EAX
 
@@ -252,7 +260,9 @@ ReadVal PROC
   loop _buildInt
 
   ; save finalInteger as userInt
-  mov	[EBP+28], EBX
+  mov	EDI, [EBP+28]   ; EDI = OFFSET userInt
+  mov	[EDI], EBX		; userInt = EBX
+  ;mov	[EBP+28], EBX	why doesn't this work?
 
   pop   ESI
   pop	EDX
