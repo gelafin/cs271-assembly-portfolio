@@ -171,16 +171,17 @@ WriteVal ENDP
 ;	userInt SDWORD = integer entered by user
 ; ---------------------------------------------------------------------------------
 ReadVal PROC
-  local temp:BYTE
-; local executes...
-;  push	EBP
-;  mov	EBP, ESP
+  local isNegative:BYTE
+  ; local executes...
+  ;  push	EBP
+  ;  mov	EBP, ESP
 
   push	EAX
   push	EBX
   push	ECX
   push	EDX
   push	ESI
+  push	EDI
 
   ; get user string and save to userString
   _getUserString:
@@ -201,13 +202,21 @@ ReadVal PROC
   ; it is a plus sign. Skip to next char, since + sign is redundant
   cld
   lodsb
-  dec	ECX				; loop 1 time fewer, because first char's check is complete
+  dec	ECX				; start loop at next char, because first char's check is complete
   jmp	_buildInt		
 
   _isNotPlusSign:
+  mov   isNegative, 0
   cmp	AL, 45			; is it a - sign?
-  ; TODO******			; the value is negative. Final step will be to convert from positive to negative by 0 - value
-  ; great place for a local var. Just need a bool isNegative
+
+  ; if not negative, leave isNegative clear and _buildInt
+  jne	_buildInt
+
+  ; else, it is negative. Set isNegative and _buildInt. Final step will be to convert from positive to negative by 0 - value
+  mov	isNegative, 1
+  cld
+  lodsb					; start loop at next char, beause first char's check is complete
+  dec	ECX
 
   ; convert the rest of the string to number form
   _buildInt:
@@ -261,16 +270,29 @@ ReadVal PROC
 
   loop _buildInt
 
+  ; if isNegative, subtract value (EBX) from 0
+  cmp	isNegative, 1
+  jne	_saveAsUserInt	; nothing to do--not negative!
+
+  ; negate value
+  push	EAX
+  mov	EAX, 0
+  sub	EAX, EBX		; EAX = 0 - EBX
+  mov	EBX, EAX		; EBX = EAX
+  pop   EAX
+
+  _saveAsUserInt:
   ; save finalInteger as userInt
   mov	EDI, [EBP+28]   ; EDI = OFFSET userInt
   mov	[EDI], EBX		; userInt = EBX
-  ;mov	[EBP+28], EBX	why doesn't this work?
 
+  pop   EDI
   pop   ESI
   pop	EDX
   pop	ECX
   pop	EBX
   pop	EAX
+  ; local executes: pop EBP
   ret	16
 ReadVal ENDP
 
