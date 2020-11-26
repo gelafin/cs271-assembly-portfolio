@@ -8,7 +8,7 @@ TITLE "String Primitives and Macros"     (Proj6_mendemar.asm)
 ; Description: displays a list of validated user integers, with their sum and average
 
 INCLUDE Irvine32.inc
-MAXSIZE = 3							; max chars/bytes of user string
+MAXSIZE = 30							; max chars/bytes of user string, including null terminator
 
 
 mDisplayString MACRO stringOffset:REQ
@@ -16,7 +16,7 @@ mDisplayString MACRO stringOffset:REQ
   call	WriteString
 ENDM
 
-mGetString	MACRO userStringOffset:REQ, userStringLength:REQ, invalidInputMsgOffset:REQ, promptOffset, charsEnteredOffset
+mGetString	MACRO userStringOffset:REQ, userStringSize:REQ, invalidInputMsgOffset:REQ, promptOffset, charsEnteredOffset
   LOCAL _getUserString, _gotValidInput
 
   ; preserve registers
@@ -33,7 +33,7 @@ mGetString	MACRO userStringOffset:REQ, userStringLength:REQ, invalidInputMsgOffs
   ; get user string
   _getUserString:
   mov	EDX, userStringOffset
-  mov	ECX, userStringLength
+  mov	ECX, userStringSize
   call	ReadString
   mov	EDI, charsEnteredOffset
   mov	[EDI], EAX
@@ -73,7 +73,7 @@ intro			BYTE	"Please provide 10 signed decimal integers.",10,13							; instruct
 
 prompt			BYTE	"Please enter a signed number: ",0
 userString		BYTE	MAXSIZE DUP(?)
-userStringLen	DWORD	LENGTHOF userString															; length including null terminator
+userStringSize	DWORD	LENGTHOF userString															; size including null terminator
 invalidErrorMsg	BYTE	"ERROR: You did not enter a signed number or your number was too big.",10,13,0
 tryAgain		BYTE	"Please try again: ",0
 userInt			SDWORD	?																			; int value after conversion from string
@@ -94,7 +94,7 @@ main PROC
   push OFFSET charsEntered
   push OFFSET prompt
   push OFFSET invalidErrorMsg
-  push userStringLen
+  push userStringSize
   push OFFSET userString
   call ReadVal
 
@@ -140,7 +140,7 @@ WriteVal PROC
   push	EDI
 
   mov	ECX, [EBP+12]
-  ; if the first char is a sign, decrement ECX (will stop loop one early, which excludes first digit, since loop does RTL stosb )
+  ; TODO: if the first char is a sign, decrement ECX (will stop loop one early, which excludes first digit, since loop does RTL stosb )
 
   ; divide the param by 10. Quotient is the next thing to be divided, and remainder is the rightmost digit
   mov	EAX, [EBP+8]		; now EAX contains the first number to divide
@@ -160,11 +160,12 @@ WriteVal PROC
   ; store AL into EDI (from right to left using std)
   mov	EDI, [EBP+16]
   std
-  stosb						; EDI.append(digitChar)	| denied writing to 0040100A
+  stosb						; [EDI].append(digitChar), then EDI-= 4
 
   loop	_convertToString
+
   ; print the string
-  mDisplayString EDI
+  mDisplayString [EBP+16]
 
   pop	EDI
   pop	EDX
