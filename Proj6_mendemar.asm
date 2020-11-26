@@ -143,7 +143,8 @@ WriteVal PROC
   ; TODO: if the first char is a sign, decrement ECX (will stop loop one early, which excludes first digit, since loop does RTL stosb )
 
   ; divide the param by 10. Quotient is the next thing to be divided, and remainder is the rightmost digit
-  mov	EAX, [EBP+8]		; now EAX contains the first number to divide
+  mov	EAX, [EBP+8]		; EAX = the first number to divide
+  mov	EDI, [EBP+16]		; EDI = OFFSET userStringOut
 
   _convertToString:  
   mov	EBX, 10
@@ -156,16 +157,15 @@ WriteVal PROC
 
   ; AL contains ASCII value to be appended to the BYTE array string
   ; store AL into EDI (from right to left using std)
-  mov	EDI, [EBP+16]
   std
-  stosb						; [EDI].append(digitChar), then EDI-= 4
-  ; TODO*********** this stupid stosb isn't decrementing, so it does [EDI].append(digitChar) and overwrites each time
+  stosb						; [EDI].append(digitChar), then EDI--
 
   pop	EAX					; restore next number to divide
   loop	_convertToString
 
   ; print the string
-  mDisplayString [EBP+16]
+  mDisplayString [EBP+16]	; TODO*****: see video at https://canvas.oregonstate.edu/courses/1784177/pages/exploration-1-lower-level-programming?module_item_id=20049973 
+							; EBP+16's memory location is the START of the byte array, but std above wrote behind the start
 
   pop	EDI
   pop	EDX
