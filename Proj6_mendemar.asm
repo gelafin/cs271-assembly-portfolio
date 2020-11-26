@@ -35,9 +35,8 @@ mGetString	MACRO userStringOffset:REQ, userStringLength:REQ, invalidInputMsgOffs
   mov	EDX, userStringOffset
   mov	ECX, userStringLength
   call	ReadString
-  mov	[charsEnteredOffset], EAX
-
-  TODO1: ; call bool number validation proc inside this validation loop
+  mov	EDI, charsEnteredOffset
+  mov	[EDI], EAX
 
   TODO: ; may not have to validate string length
   ; if user string is too big (inputCharCount > ECX), get another string
@@ -91,8 +90,8 @@ thanks			BYTE	"Thanks for playing! I had so much fun",0
 .code
 main PROC
   ; get valid number from user
-  push OFFSET charsEntered
   push OFFSET userInt
+  push OFFSET charsEntered
   push OFFSET prompt
   push OFFSET invalidErrorMsg
   push userStringLen
@@ -212,7 +211,8 @@ ReadVal PROC
   mGetString [EBP+8], [EBP+12], [EBP+16], [EBP+20], [EBP+24]
   
   ; convert userString to SDWORD int
-  mov	ECX, [EBP+24]   ; loop as many times as there are chars in what user entered
+  mov	ESI, [EBP+24]   ; loop as many times as there are chars in what user entered
+  mov	ECX, [ESI]		;   (cont)
   mov	EBX, 0			; tracks finalInteger
   mov	ESI, [EBP+8]	; ESI = OFFSET userString
   cld					; starting from the msb
