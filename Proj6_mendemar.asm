@@ -98,8 +98,8 @@ main PROC
   call ReadVal
 
   ; convert DWORD integer to ASCII string and print
-;  push 5
-;  call WriteVal
+  push 5
+  call WriteVal
 
   ; print goodbye message
   call CrLf
@@ -112,50 +112,40 @@ main ENDP
 ;
 ; prints a given integer to the terminal
 ;
-; Preconditions: 
+; Preconditions: integer is validated
 ;
 ; Receives:
-;   [ebp+8]  = integer to print (32 bits or fewer)
+;   [ebp+8] DWORD = integer to print (32 bits or fewer)
 ; ---------------------------------------------------------------------------------
 WriteVal PROC
-  push	EBP
-  mov	EBP, ESP
+  local userIntString
+  ; local directive executes...
+  ;   push	EBP
+  ;   mov	EBP, ESP
+
   push	EAX
   push  ECX
-
-  mov	EAX, [EBP+8]		; EAX now contains user number
-  mov	ECX, 8				; TODO: replace with LENGTHOF userNumber (# of digits)
   
-  ; check each bit until nonzero value--this is the beginning of what needs to be printed
-  _advanceToNonzero:
-  
+  ; divide the param by 10. Quotient is the next thing to be divided, and remainder is the rightmost digit
 
-  ; if no nonzero value, print 0 and jump to _print
-  ; else, continue to _convert
-
-  _convert:
-  ; for each digit, add 48 to convert from integer to the ASCII code for that integer
-  
 
   ; after conversion, AL contains ASCII value to be appended to the BYTE array string
-  ;stosb
+  ;stosb from right to left using sdf
 
-  loop	_convert
 
-  _print:
   ; print the string
-  ;mDisplayString OFFSET EDX
+  mDisplayString EDI
 
   pop	ECX
   pop	EAX
-  pop	EBP
+  ; local directive executes: pop	EBP
   ret   4
 WriteVal ENDP
 
 ; ---------------------------------------------------------------------------------
 ; Name: ReadVal
 ;
-; reads a given integer from the terminal
+; reads a given integer from the terminal, handling + and - signs as appropriate
 ;
 ; Preconditions: 
 ;
@@ -240,7 +230,7 @@ ReadVal PROC
   ; TODO: make this loop into a helper function convertAsciiToInt
 
   ; ascii value is for an integer. Convert it, append it, and loop to next char  
-  ; using finalInteger = 10 * finalInteger + (asciiValue - 48)
+  ; convert via: finalInteger = 10 * finalInteger + (asciiValue - 48)
     ; AL = asciiValue of next char of userString
     ; EBX = finalInteger
   ; EBX = EBX * 10 + (AL - 48)
