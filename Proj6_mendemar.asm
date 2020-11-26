@@ -150,18 +150,18 @@ WriteVal PROC
   cdq
   idiv	EBX					; now EAX contains the next thing to divide, and EDX contains rightmost digit
 
+  push	EAX					; save next number to divide
   mov	AL, DL				; no data is lost, because each converted result is only 1 byte
   add	AL, '0'			    ; convert to string
-
-  ; convert the digit (in AL) to its ASCII code
-  ; is this necessary?
 
   ; AL contains ASCII value to be appended to the BYTE array string
   ; store AL into EDI (from right to left using std)
   mov	EDI, [EBP+16]
   std
   stosb						; [EDI].append(digitChar), then EDI-= 4
+  ; TODO*********** this stupid stosb isn't decrementing, so it does [EDI].append(digitChar) and overwrites each time
 
+  pop	EAX					; restore next number to divide
   loop	_convertToString
 
   ; print the string
