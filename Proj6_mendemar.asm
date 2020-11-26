@@ -171,12 +171,14 @@ WriteVal ENDP
 ;	userInt SDWORD = integer entered by user
 ; ---------------------------------------------------------------------------------
 ReadVal PROC
-;  local temp
+  local temp:BYTE
+; local executes...
+;  push	EBP
+;  mov	EBP, ESP
 
-  push	EBP
-  mov	EBP, ESP
   push	EAX
   push	EBX
+  push	ECX
   push	EDX
   push	ESI
 
@@ -266,9 +268,9 @@ ReadVal PROC
 
   pop   ESI
   pop	EDX
+  pop	ECX
   pop	EBX
   pop	EAX
-  pop	EBP
   ret	16
 ReadVal ENDP
 
