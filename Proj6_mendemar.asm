@@ -80,6 +80,8 @@ tryAgain		BYTE	"Please try again: ",0
 userInt			SDWORD	?																			; int value after conversion from string
 charsEntered	DWORD	?																			; how many characters the user entered
 
+userStringOut	DWORD	?
+
 youEntered		BYTE	"You entered the following numbers: ",10,13,0
 theSumIs		BYTE	"The sum of these numbers is: ",0
 theAvgIs		BYTE	"The rounded average is: ",0
@@ -98,7 +100,10 @@ main PROC
   call ReadVal
 
   ; convert DWORD integer to ASCII string and print
-  push 5
+  call CrLf
+  push OFFSET userStringOut
+  push charsEntered
+  push userInt
   call WriteVal
 
   ; print goodbye message
@@ -114,8 +119,14 @@ main ENDP
 ;
 ; Preconditions: integer is validated
 ;
+; Postconditions:
+;	userStringOut = string of ascii codes representing the integer param
+;
 ; Receives:
-;   [ebp+8] DWORD = integer to print (32 bits or fewer)
+;   [ebp+8]  SDWORD = integer to print (32 bits or fewer)
+;	[ebp+12] DWORD  = number of digits in integer to print  TODO: subtract one if sign
+;	[ebp+16] BYTE   = OFFSET userStringOut
+;
 ; ---------------------------------------------------------------------------------
 WriteVal PROC
   local userIntString
@@ -124,22 +135,45 @@ WriteVal PROC
   ;   mov	EBP, ESP
 
   push	EAX
+  push	EBX
   push  ECX
-  
+  push	EDX
+  push	EDI
+
+  mov	ECX, [EBP+12]
+  ; if the first char is a sign, decrement ECX (will stop loop one early, which excludes first digit, since loop does RTL stosb )
+
   ; divide the param by 10. Quotient is the next thing to be divided, and remainder is the rightmost digit
+  mov	EAX, [EBP+8]		; now EAX contains the first number to divide
 
+  _convertToString:  
+  mov	EBX, 10
+  cdq
+  idiv	EBX					; now EAX contains the next thing to divide, and EDX contains rightmost digit
 
-  ; after conversion, AL contains ASCII value to be appended to the BYTE array string
-  ;stosb from right to left using sdf
+  mov	AL, DL				; no data is lost, because each converted result is only 1 byte
+  add	AL, '0'			    ; convert to string
 
+  ; convert the digit (in AL) to its ASCII code
+  ; is this necessary?
 
+  ; AL contains ASCII value to be appended to the BYTE array string
+  ; store AL into EDI (from right to left using std)
+  mov	EDI, [EBP+16]
+  std
+  stosb						; EDI.append(digitChar)	| denied writing to 0040100A
+
+  loop	_convertToString
   ; print the string
   mDisplayString EDI
 
+  pop	EDI
+  pop	EDX
   pop	ECX
+  pop	EBX
   pop	EAX
   ; local directive executes: pop	EBP
-  ret   4
+  ret   8
 WriteVal ENDP
 
 ; ---------------------------------------------------------------------------------
