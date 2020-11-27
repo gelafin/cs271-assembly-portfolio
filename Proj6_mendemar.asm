@@ -100,6 +100,7 @@ main PROC
 
   ; convert DWORD integer to ASCII string and print
   call CrLf
+  push charsEntered
   push OFFSET userStringOut
   push charsEntered
   push userInt
@@ -125,6 +126,7 @@ main ENDP
 ;   [ebp+8]  SDWORD = integer to print (32 bits or fewer)
 ;	[ebp+12] DWORD  = number of digits in integer to print  TODO: subtract one if sign
 ;	[ebp+16] BYTE   = OFFSET userStringOut
+;	[ebp+20] DWORD  = charsEntered
 ;
 ; ---------------------------------------------------------------------------------
 WriteVal PROC
@@ -166,8 +168,7 @@ WriteVal PROC
   loop	_convertToString
 
   ; print the string
-  mDisplayString [EBP+16]	; TODO*****: see video at https://canvas.oregonstate.edu/courses/1784177/pages/exploration-1-lower-level-programming?module_item_id=20049973 
-							; EBP+16's memory location is the START of the byte array, but std above wrote behind the start
+  mDisplayString [EBP+16]	; for help reversing string, see video at https://canvas.oregonstate.edu/courses/1784177/pages/exploration-1-lower-level-programming?module_item_id=20049973 
 
   pop	EDI
   pop	EDX
