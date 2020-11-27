@@ -79,7 +79,7 @@ tryAgain		BYTE	"Please try again: ",0
 userInt			SDWORD	?																			; int value after conversion from string
 charsEntered	DWORD	?																			; how many characters the user entered
 
-userStringOut	DWORD	?
+userStringOut	BYTE	MAXSIZE DUP(?)
 
 youEntered		BYTE	"You entered the following numbers: ",10,13,0
 theSumIs		BYTE	"The sum of these numbers is: ",0
@@ -145,6 +145,8 @@ WriteVal PROC
   ; divide the param by 10. Quotient is the next thing to be divided, and remainder is the rightmost digit
   mov	EAX, [EBP+8]		; EAX = the first number to divide
   mov	EDI, [EBP+16]		; EDI = OFFSET userStringOut
+  add	EDI, charsEntered	; move pointer to prepare for writing backwards
+  dec	EDI					; EDI was already pointing at the first element before adding charsEntered
 
   _convertToString:  
   mov	EBX, 10
@@ -158,7 +160,7 @@ WriteVal PROC
   ; AL contains ASCII value to be appended to the BYTE array string
   ; store AL into EDI (from right to left using std)
   std
-  stosb						; [EDI].append(digitChar), then EDI--
+  stosb						; [EDI] = digitChar, then EDI--
 
   pop	EAX					; restore next number to divide
   loop	_convertToString
