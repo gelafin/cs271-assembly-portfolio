@@ -130,10 +130,10 @@ main ENDP
 ; Receives:
 ;   [ebp+8]  SDWORD = integer to print (32 bits or fewer)
 ;	[ebp+12] DWORD  = charsEntered: number of digits in integer to print
-;	[ebp+16] BYTE   = OFFSET userStringOut
+;	[ebp+16] DWORD  = OFFSET userStringOut
 ;	[ebp+20] DWORD  = charsEntered
-;	[ebp+24] BYTE	= isNegative: 1 if the integer to print is a negative number; 0 if positive
-;   [ebp+28] BYTE   = OFFSET negativeSign: memory location of ascii code of negative sign
+;	[ebp+24] DWORD	= isNegative: 1 if the integer to print is a negative number; 0 if positive
+;   [ebp+28] DWORD  = OFFSET negativeSign: memory location of ascii code of negative sign
 ;
 ; ---------------------------------------------------------------------------------
 WriteVal PROC
@@ -202,7 +202,7 @@ WriteVal PROC
     loop  _convertNext
 
   ; print the string
-  mDisplayString [EBP+16]	    ; for help reversing string, see video at https://canvas.oregonstate.edu/courses/1784177/pages/exploration-1-lower-level-programming?module_item_id=20049973 
+  mDisplayString [EBP+16]
 
   pop	EDI
   pop	EDX
@@ -210,7 +210,7 @@ WriteVal PROC
   pop	EBX
   pop	EAX
   ; local directive executes: pop	EBP
-  ret   8
+  ret   24
 WriteVal ENDP
 
 ; ---------------------------------------------------------------------------------
