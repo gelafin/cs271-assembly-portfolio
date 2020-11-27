@@ -174,16 +174,14 @@ WriteVal PROC
   sub   EAX, EBX                ; EAX = 0 - userInt
 
   ; skip numberIsPositive section
-  jmp _convertToString
+  jmp _convertNext
 
   ; else, it's already positive, so assign directly to EAX
   _numberIsPositive:
     mov   EAX, [EBP+8]		    ; EAX = the first number to divide
 
   ; divide the param by 10. Quotient is the next thing to be divided, and remainder is the rightmost digit  
-  ; EAX = the first number to divide
-  _convertToString:
-
+  ; EAX is the first number to divide
   _convertNext:  
     mov   EBX, 10
     cdq
