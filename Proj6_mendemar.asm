@@ -91,6 +91,7 @@ thanks			BYTE	"Thanks for playing! I had so much fun",0
 
 .code
 main PROC
+  ; TODO: loop 10 times to get 10 valid inputs
   ; get valid number from user
   push OFFSET isNegative
   push OFFSET userInt
@@ -168,7 +169,11 @@ WriteVal PROC
   dec   ECX
   dec   EDI
 
-  ; convert negative number to positive by subtracting from 0
+  ; convert negative number to positive by subtracting from 0 TODO: need to use 0 - QWORD mem operand, not register. Asked about SBB
+  ; if no SBB, make an absoluteValue proc to... 
+  ;   1. convert to bitstring using two's comp (invert bits, then add 1)
+  ;   2. clear the first bit and read back as a number
+
   mov   EAX, 0      		    ; EAX = 0
   mov   EBX, [EBP+8]            ; EBX = userInt
   sub   EAX, EBX                ; EAX = 0 - userInt
@@ -214,7 +219,7 @@ WriteVal ENDP
 ; ---------------------------------------------------------------------------------
 ; Name: ReadVal
 ;
-; reads a given integer from the terminal, handling + and - signs as appropriate
+; reads a given SDWORD integer from the terminal, handling + and - signs as appropriate
 ;
 ; Preconditions: 
 ;
@@ -228,10 +233,10 @@ WriteVal ENDP
 ;	[ebp+32] = OFFSET isNegative: to be assigned 1 if value is negative; 0 otherwise
 ;
 ; Returns:
-;	userInt SDWORD = integer entered by user
+;	userInt SDWORD = integer entered by user TODO: should append to an array of SDWORDs instead
 ; ---------------------------------------------------------------------------------
 ReadVal PROC
-  local glo:BYTE
+  local hasSign:BYTE
   ; local executes...
   ;  push	EBP
   ;  mov	EBP, ESP
@@ -249,18 +254,19 @@ ReadVal PROC
   
   ; convert userString to SDWORD int
   mov	ESI, [EBP+24]       ; loop as many times as there are chars in what user entered
-  mov	ECX, [ESI]		    ;   (cont)
+  mov	ECX, [ESI]		    ; ECX = charsEntered
   mov	EBX, 0			    ; tracks finalInteger
   mov	ESI, [EBP+8]	    ; ESI = OFFSET userString
   cld					    ; starting from the msb
-  lodsb					    ; MOV AL, [ESI]
+  lodsb					    ; MOV AL, [ESI] then increment (due to cld) ESI
 
-  ; got the first ascii value in AL. 
+  ; got the first ascii value in AL
   ; VALIDATE: check if the first char is a +/- sign
   cmp	AL, 43		    	; is it a + sign?
   jne	_isNotPlusSign
 
   ; it is a plus sign. Skip to next char, since + sign is redundant
+  mov   hasSign, 1
   cld
   lodsb
   dec	ECX		    		; start loop at next char, because first char's check is complete
@@ -277,6 +283,7 @@ ReadVal PROC
   jne	_buildInt
 
   ; else, it is negative. Set isNegative and _buildInt. Final step will be to convert from positive to negative by 0 - value
+  mov   hasSign, 1
   push	EDI
   mov	EDI, [EBP+32]	    ; EDI = OFFSET isNegative
   mov	[EDI], DWORD PTR 1  ; isNegative = 1
@@ -284,6 +291,17 @@ ReadVal PROC
   cld
   lodsb					    ; start loop at next char, beause first char's check is complete
   dec	ECX
+
+  ; VALDIATE: now that ESI points to first number, count the digits 
+  ; ESI+charsEntered = lastDigit
+  ; lastDigit - ESI = digits
+  ; if hasSign, dec digits to account for sign, since only digits are to be counted
+
+
+  ; if digits > 10 (max digits of a SDWORD), _invalidInput
+
+
+  ; if 
 
   ; convert the rest of the string to number form
   _buildInt:
