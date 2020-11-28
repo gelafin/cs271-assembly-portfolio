@@ -81,11 +81,12 @@ charsEntered	DWORD	?																			; how many characters the user entered
 isNegative		DWORD	?
 
 userInts        SDWORD  TESTCOUNT DUP(?)                                                            ; used for testing
+separator       BYTE    ", ",0
 
 negativeSign    BYTE    45,0
 userStringOut	BYTE	MAXSIZE DUP(?)
 
-youEntered		BYTE	"You entered the following numbers: ",10,13,0
+youEntered		BYTE	"You entered the following numbers: ",0
 theSumIs		BYTE	"The sum of these numbers is: ",0
 theAvgIs		BYTE	"The rounded average is: ",0
 
@@ -98,35 +99,59 @@ main PROC
   mov  EDI, OFFSET userInts
 
   _testRead:
-  ; get valid number from user
-  push OFFSET isNegative
-  push OFFSET userInt
-  push OFFSET charsEntered
-  push OFFSET prompt
-  push OFFSET invalidErrorMsg
-  push userStringSize
-  push OFFSET userString
-  call ReadVal
+    ; get valid number from user
+    push OFFSET isNegative
+    push OFFSET userInt
+    push OFFSET charsEntered
+    push OFFSET prompt
+    push OFFSET invalidErrorMsg
+    push userStringSize
+    push OFFSET userString
+    call ReadVal
 
-  ; append userInt to array
-  push EAX
-  mov  EAX, userInt
-  mov  [EDI], EAX
-  pop  EAX
+    ; append userInt to array
+    push EAX
+    mov  EAX, userInt
+    mov  [EDI], EAX
+    pop  EAX
 
-  ; maintain test loop
-  add  EDI, TYPE userInts               ; move userInts pointer to next element
-  loop _testRead
+    ; maintain test loop
+    add  EDI, TYPE userInts               ; move userInts pointer to next element
+    loop _testRead
 
-  ; convert DWORD integer to ASCII string and print
-  call CrLf
-  push OFFSET negativeSign
-  push isNegative
-  push charsEntered
-  push OFFSET userStringOut
-  push charsEntered
-  push userInt
-  call WriteVal
+  ; print the 10 integers
+  mov  EDX, OFFSET youEntered
+  call WriteString
+
+  mov  ESI, OFFSET userInts
+  mov  ECX, TESTCOUNT
+
+  _testWrite:
+    ; userInt = [ESI]. For test
+    push EAX
+    mov  EAX, [ESI]
+    mov  userInt, EAX
+    pop  EAX
+
+    ; convert userInt to ASCII string and print
+    push OFFSET negativeSign
+    push isNegative
+    push charsEntered
+    push OFFSET userStringOut
+    push charsEntered
+    push userInt
+    call WriteVal
+
+    ; print a separator (e.g., comma and space) unless it's the last element
+    cmp  ECX, 1
+    je   _noSeparator
+    mov  EDX, OFFSET separator
+    call WriteString
+
+    _noSeparator:
+    ; maintain test loop
+    add  ESI, TYPE userInts               ; move userInts pointer to next element
+    loop _testWrite
 
   ; print goodbye message
   call CrLf
