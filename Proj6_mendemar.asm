@@ -78,7 +78,6 @@ invalidErrorMsg	BYTE	"ERROR: You did not enter a signed number or your number wa
 tryAgain		BYTE	"Please try again: ",0
 userInt 		SDWORD	?																	        ; int value after conversion from string
 charsEntered	DWORD	?																			; how many characters the user entered
-isNegative		DWORD	?
 
 userInts        SDWORD  TESTCOUNT DUP(?)                                                            ; used for testing
 separator       BYTE    ", ",0
@@ -100,7 +99,6 @@ main PROC
 
   _testRead:
     ; get valid number from user
-    push OFFSET isNegative
     push OFFSET userInt
     push OFFSET charsEntered
     push OFFSET prompt
@@ -136,7 +134,6 @@ main PROC
 
     ; convert userInt to ASCII string and print
     push OFFSET negativeSign
-    push isNegative
     push charsEntered
     push OFFSET userStringOut
     push charsEntered
@@ -176,12 +173,11 @@ main ENDP
 ;	[ebp+12] DWORD  = charsEntered: number of digits in integer to print
 ;	[ebp+16] DWORD  = OFFSET userStringOut
 ;	[ebp+20] DWORD  = charsEntered
-;	[ebp+24] DWORD	= isNegative: 1 if the integer to print is a negative number; 0 if positive
-;   [ebp+28] DWORD  = OFFSET negativeSign: memory location of ascii code of negative sign
+;   [ebp+24] DWORD  = OFFSET negativeSign: memory location of ascii code of negative sign
 ;
 ; ---------------------------------------------------------------------------------
 WriteVal PROC
-  local userIntString
+  local isNe:BYTE
   ; local directive executes...
   ;   push	EBP
   ;   mov	EBP, ESP
@@ -195,17 +191,15 @@ WriteVal PROC
   mov	ECX, [EBP+12]           ; ECX = charsEntered (including "-" if any)
   mov	EDI, [EBP+16]		    ; EDI = OFFSET userStringOut
   add   EDI, charsEntered	    ; move pointer to prepare for writing backwards
-  dec   EDI					; EDI was already pointing at the first element before adding charsEntered
+  dec   EDI				     	; EDI was already pointing at the first element before adding charsEntered
 
-  ; if a negative number, undo processing from earlier and assign 2's comp to EAX
-  mov	AL, [EBP+24]            ; AL = isNegative
-  cmp	AL, 1				    ; compare isNegative to 1 (true)
-  jne	_numberIsPositive	    ; number is positive! Move on and convert to string
+  ; check if userInt is negative
+  cmp   userInt, 0
+  jge   _numberIsPositive	    ; number is positive! Move on and convert to string
 
-  ; number is negative
-  ; TODO: good place for a helper macro
+  ; number is negative; undo processing from earlier and assign 2's comp to EAX
   ; print a negative sign
-  mov	EDX, [EBP+28]		    ; EDX = (ascii for "-")
+  mov	EDX, [EBP+24]		    ; EDX = (ascii for "-")
   call	WriteString
 
   ; decrement loop counter and userStringOut pointer to account for not including the negative sign
@@ -214,7 +208,7 @@ WriteVal PROC
 
   ; convert negative number to positive by subtracting from 0 TODO: need to use 0 - QWORD mem operand, not register. Asked about SBB
   ; if no SBB, make an absoluteValue proc to... 
-  ;   1. convert to bitstring using two's comp (invert bits, then add 1)
+  ;   1. apply two's comp (invert bits, then add 1)
   ;   2. clear the first bit and read back as a number
 
   mov   EAX, 0      		    ; EAX = 0
@@ -256,7 +250,7 @@ WriteVal PROC
   pop	EBX
   pop	EAX
   ; local directive executes: pop	EBP
-  ret   24
+  ret   20
 WriteVal ENDP
 
 ; ---------------------------------------------------------------------------------
@@ -273,13 +267,12 @@ WriteVal ENDP
 ;	[ebp+20] = OFFSET prompt
 ;	[ebp+24] = OFFSET charsEntered
 ;	[ebp+28] = OFFSET userInt: SDWORD to store integer entered by user
-;	[ebp+32] = OFFSET isNegative: to be assigned 1 if value is negative; 0 otherwise
 ;
 ; Returns:
 ;	userInt SDWORD = integer entered by user
 ; ---------------------------------------------------------------------------------
 ReadVal PROC
-  local hasSign:BYTE
+  local hasSign:BYTE, isNegative:BYTE
   ; local executes...
   ;  push	EBP
   ;  mov	EBP, ESP
@@ -316,10 +309,7 @@ ReadVal PROC
   jmp	_buildInt		
 
   _isNotPlusSign:
-  push  EDI
-  mov	EDI, [EBP+32]       ; EDI = OFFSET isNegative
-  mov   [EDI], DWORD PTR 0	; isNegative = 0
-  pop	EDI  
+  mov   isNegative, 0       ; isNegative = 0 (false)
   cmp	AL, 45  			; is it a - sign?
 
   ; if not negative, leave isNegative clear and _buildInt
@@ -327,10 +317,7 @@ ReadVal PROC
 
   ; else, it is negative. Set isNegative and _buildInt. Final step will be to convert from positive to negative by 0 - value
   mov   hasSign, 1
-  push	EDI
-  mov	EDI, [EBP+32]	    ; EDI = OFFSET isNegative
-  mov	[EDI], DWORD PTR 1  ; isNegative = 1
-  pop	EDI
+  mov   isNegative, 1       ; isNegative = 1 (true)
   cld
   lodsb					    ; start loop at next char, beause first char's check is complete
   dec	ECX
@@ -395,13 +382,10 @@ ReadVal PROC
   loop _buildInt
 
   ; if isNegative, subtract value (EBX) from 0
-  push	ESI
-  mov	ESI, [EBP+32]
-  cmp	[ESI], DWORD PTR 1  ; compare isNegative to 1 (true)
-  pop	ESI
-  jne	_saveAsUserInt	    ; nothing to do--not negative!
+  cmp   isNegative, 1       ; compare isNegative to 1 (true)
+  jne	_saveAsUserInt	    ; nothing to do here if not equal--it's positive!
 
-  ; negate value
+  ; number should be negative, so negate value
   push	EAX
   mov	EAX, 0
   sub	EAX, EBX		    ; EAX = 0 - EBX
@@ -420,7 +404,7 @@ ReadVal PROC
   pop	EBX
   pop	EAX
   ; local executes: pop EBP
-  ret	16
+  ret	20
 ReadVal ENDP
 
 END main
