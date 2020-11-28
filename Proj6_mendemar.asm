@@ -115,7 +115,7 @@ main PROC
   pop  EAX
 
   ; maintain test loop
-  add  EDI, SIZE userInts               ; move userInts pointer to next element
+  add  EDI, TYPE userInts               ; move userInts pointer to next element
   loop _testRead
 
   ; convert DWORD integer to ASCII string and print
