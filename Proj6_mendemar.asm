@@ -282,7 +282,7 @@ WriteVal ENDP
 ;	userInt SDWORD = integer entered by user
 ; ---------------------------------------------------------------------------------
 ReadVal PROC
-  local isNegative:BYTE, digitCount:DWORD
+  local hasSign:BYTE, isNegative:BYTE, digitCount:DWORD
   ; local executes...
   ;  push	EBP
   ;  mov	EBP, ESP
@@ -312,6 +312,7 @@ ReadVal PROC
   jne	_isNotPlusSign
 
   ; it is a plus sign. Skip to next char, since + sign is redundant
+  mov   hasSign, 1          ; hasSign = 1 (true)
   cld
   lodsb
   dec	ECX		    		; start loop at next char, because first char's check is complete
@@ -325,6 +326,7 @@ ReadVal PROC
   jne	_buildInt
 
   ; else, it is negative. Set isNegative and _buildInt. Final step will be to convert from positive to negative by 0 - value
+  mov   hasSign, 1          ; hasSign = 1 (true)
   mov   isNegative, 1       ; isNegative = 1 (true)
   cld
   lodsb					    ; start loop at next char, beause first char's check is complete
@@ -410,9 +412,9 @@ ReadVal PROC
   mov   EAX, [EBP+24]       ; EAX = OFFSET charsEntered
   mov   EBX, [EAX]          ; digitCount = charsEntered
   mov   digitCount, EBX
-  cmp   isNegative, 1       ; compare isNegative to 1 (true)
+  cmp   hasSign, 1          ; compare hasSign to 1 (true)
   pop   EAX
-  jne   _saveDigitCount     ; if isNegative, decrement digit count before saving (to not include the sign)
+  jne   _saveDigitCount     ; if hasSign, decrement digit count before saving (to not include the sign)
   
   dec   digitCount
 
