@@ -160,6 +160,8 @@ main PROC
     add  EBX, TYPE charLengths            ; move charLengths pointer to next element
     loop _testWrite
 
+
+
   ; print goodbye message
   call CrLf
   call CrLf
@@ -367,23 +369,30 @@ ReadVal PROC
   ; EBX = EBX * 10 + (AL - 48)
   
   sub	AL, 48		        ; AL - 48 (aka, nextDigit to add)
-;  mov	temp, AL		    ; temp = AL		TODO: make local nextDigit
-  mov	DL, AL			    ;				TODO: delete after local nextDigit
+  mov	DL, AL
   
   push	EAX				    ; save EAX
   mov	EAX, 10
   push	EDX				    ; preserve temp EDX for mul
   mul	EBX				    ; EAX = EBX * 10
+
+  ; VALIDATE: MUL increases total, so make sure result fits in 32-bit reg/mem
+  jo    _invalidInput
+  jc    _invalidInput
+
   mov	EBX, EAX		    ; EBX = EAX
   pop	EDX				    ; restore EDX after mul
   pop	EAX				    ; restore EAX
 
-;  add	EBX, DWORD PTR temp ; EBX = EBX + temp
   push	EBX
   movzx EBX, DL
-  mov   EDX, EBX		    ;				TODO: maybe delete after local nextDigit
+  mov   EDX, EBX		    
   pop	EBX
-  add	EBX, EDX		    ;				TODO: delete after local nextDigit
+  add	EBX, EDX		    
+
+  ; VALIDATE: ADD increases total, so make sure result fits in 32-bit reg/mem
+  jo    _invalidInput
+  jc    _invalidInput
 
   ; maintain loop
   cld					    ; iterate left to right
