@@ -78,8 +78,9 @@ invalidErrorMsg	BYTE	"ERROR: You did not enter a signed number or your number wa
 tryAgain		BYTE	"Please try again: ",0
 userInt 		SDWORD	?																	        ; int value after conversion from string
 charsEntered    DWORD   ?                                                                           ; how many characters long a given number is
-charLengths  	DWORD	TESTCOUNT DUP(?)															; how many characters long each number is
+charLengths  	DWORD	TESTCOUNT DUP(?)															; how many characters long each number is. TODO: rename to digitLengths
 
+digitsEntered   DWORD   ?                                                                           ; holds a given value of charLengths for testing
 userInts        SDWORD  TESTCOUNT DUP(?)                                                            ; used for testing
 separator       BYTE    ", ",0
 
@@ -137,13 +138,13 @@ main PROC
     mov  EAX, [ESI]
     mov  userInt, EAX                      ; userInt = userInts[index]
     mov  EAX, [EBX]
-    mov  charsEntered, EAX                 ; charsEntered = charLengths[index]. For test
+    mov  digitsEntered, EAX                ; digitsEntered = charLengths[index]. For test
     pop  EAX
 
     ; convert userInt to ASCII string and print
     push OFFSET negativeSign
     push OFFSET userStringOut
-    push charsEntered                       ; TODO: this should be digitsEntered, since it's already processed for sign
+    push digitsEntered                       ; already accounts for not including sign
     push userInt
     call WriteVal
 
@@ -178,7 +179,7 @@ main ENDP
 ;
 ; Receives:
 ;   [ebp+8]  SDWORD = integer to print (32 bits or fewer)
-;	[ebp+12] DWORD  = charsEntered: number of digits in integer to print
+;	[ebp+12] DWORD  = digitsEntered: number of digits in integer to print
 ;	[ebp+16] DWORD  = OFFSET userStringOut
 ;   [ebp+20] DWORD  = OFFSET negativeSign: memory location of ascii code of negative sign
 ;
@@ -197,7 +198,8 @@ WriteVal PROC
 
   mov	ECX, [EBP+12]           ; ECX = charsEntered (including "-" if any)
   mov	EDI, [EBP+16]		    ; EDI = OFFSET userStringOut
-  add   EDI, charsEntered	    ; move pointer to prepare for writing backwards
+  mov   [EDI], DWORD PTR 0      ; clear userStringOut to make sure old digits aren't written by mDisplayString
+  add   EDI, digitsEntered	    ; move pointer to prepare for writing backwards
   dec   EDI				     	; EDI was already pointing at the first element before adding charsEntered
 
   ; check if userInt is negative
@@ -209,9 +211,9 @@ WriteVal PROC
   mov	EDX, [EBP+20]		    ; EDX = (ascii for "-")
   call	WriteString
 
-  ; decrement loop counter and userStringOut pointer to account for not including the negative sign
-  dec   ECX
-  dec   EDI
+  ; decrement loop counter and userStringOut pointer to account for not including the negative sign. TODO: remove?
+;  dec   ECX
+;  dec   EDI
 
   ; convert negative number to positive by subtracting from 0 TODO: need to use 0 - QWORD mem operand, not register. Asked about SBB
   ; if no SBB, make an absoluteValue proc to... 
