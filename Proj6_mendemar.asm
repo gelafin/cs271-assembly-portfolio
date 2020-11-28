@@ -120,6 +120,7 @@ main PROC
     loop _testRead
 
   ; print the 10 integers
+  call CrLf
   mov  EDX, OFFSET youEntered
   call WriteString
 
@@ -154,6 +155,7 @@ main PROC
     loop _testWrite
 
   ; print goodbye message
+  call CrLf
   call CrLf
   mDisplayString OFFSET thanks
 
