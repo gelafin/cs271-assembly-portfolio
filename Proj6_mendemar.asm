@@ -77,7 +77,8 @@ userStringSize	DWORD	LENGTHOF userString															; size including null ter
 invalidErrorMsg	BYTE	"ERROR: You did not enter a signed number or your number was too big.",10,13,0
 tryAgain		BYTE	"Please try again: ",0
 userInt 		SDWORD	?																	        ; int value after conversion from string
-charsEntered	DWORD	?																			; how many characters the user entered
+charsEntered    DWORD   ?                                                                           ; how many characters long a given number is
+charLengths  	DWORD	TESTCOUNT DUP(?)															; how many characters long each number is
 
 userInts        SDWORD  TESTCOUNT DUP(?)                                                            ; used for testing
 separator       BYTE    ", ",0
@@ -96,9 +97,11 @@ main PROC
   ; get 10 valid inputs
   mov  ECX, TESTCOUNT
   mov  EDI, OFFSET userInts
+  mov  EBX, OFFSET charLengths
 
   _testRead:
     ; get valid number from user
+    push EBX                              ; address of first empty element in charLengths
     push OFFSET userInt
     push OFFSET charsEntered
     push OFFSET prompt
@@ -115,6 +118,7 @@ main PROC
 
     ; maintain test loop
     add  EDI, TYPE userInts               ; move userInts pointer to next element
+    add  EBX, TYPE charLengths            ; move charLengths pointer to next element
     loop _testRead
 
   ; print the 10 integers
@@ -122,21 +126,24 @@ main PROC
   mov  EDX, OFFSET youEntered
   call WriteString
 
-  mov  ESI, OFFSET userInts
+  ; prepare for loop
+  mov  ESI, OFFSET userInts                ; ESI = array of numbers to print
   mov  ECX, TESTCOUNT
 
+  mov  EBX, OFFSET charLengths
   _testWrite:
     ; userInt = [ESI]. For test
     push EAX
     mov  EAX, [ESI]
-    mov  userInt, EAX
+    mov  userInt, EAX                      ; userInt = userInts[index]
+    mov  EAX, [EBX]
+    mov  charsEntered, EAX                 ; charsEntered = charLengths[index]. For test
     pop  EAX
 
     ; convert userInt to ASCII string and print
     push OFFSET negativeSign
-    push charsEntered
     push OFFSET userStringOut
-    push charsEntered
+    push charsEntered                       ; TODO: this should be digitsEntered, since it's already processed for sign
     push userInt
     call WriteVal
 
@@ -149,6 +156,7 @@ main PROC
     _noSeparator:
     ; maintain test loop
     add  ESI, TYPE userInts               ; move userInts pointer to next element
+    add  EBX, TYPE charLengths            ; move charLengths pointer to next element
     loop _testWrite
 
   ; print goodbye message
@@ -172,8 +180,7 @@ main ENDP
 ;   [ebp+8]  SDWORD = integer to print (32 bits or fewer)
 ;	[ebp+12] DWORD  = charsEntered: number of digits in integer to print
 ;	[ebp+16] DWORD  = OFFSET userStringOut
-;	[ebp+20] DWORD  = charsEntered
-;   [ebp+24] DWORD  = OFFSET negativeSign: memory location of ascii code of negative sign
+;   [ebp+20] DWORD  = OFFSET negativeSign: memory location of ascii code of negative sign
 ;
 ; ---------------------------------------------------------------------------------
 WriteVal PROC
@@ -199,7 +206,7 @@ WriteVal PROC
 
   ; number is negative; undo processing from earlier and assign 2's comp to EAX
   ; print a negative sign
-  mov	EDX, [EBP+24]		    ; EDX = (ascii for "-")
+  mov	EDX, [EBP+20]		    ; EDX = (ascii for "-")
   call	WriteString
 
   ; decrement loop counter and userStringOut pointer to account for not including the negative sign
@@ -250,7 +257,7 @@ WriteVal PROC
   pop	EBX
   pop	EAX
   ; local directive executes: pop	EBP
-  ret   20
+  ret   16
 WriteVal ENDP
 
 ; ---------------------------------------------------------------------------------
@@ -267,12 +274,13 @@ WriteVal ENDP
 ;	[ebp+20] = OFFSET prompt
 ;	[ebp+24] = OFFSET charsEntered
 ;	[ebp+28] = OFFSET userInt: SDWORD to store integer entered by user
+;   [ebp+32] = OFFSET charLengths (at index to save in): offset of first empty element in DWORD array storing the number of characters in each number
 ;
 ; Returns:
 ;	userInt SDWORD = integer entered by user
 ; ---------------------------------------------------------------------------------
 ReadVal PROC
-  local hasSign:BYTE, isNegative:BYTE
+  local hasSign:BYTE, isNegative:BYTE, digitCount:DWORD
   ; local executes...
   ;  push	EBP
   ;  mov	EBP, ESP
@@ -396,6 +404,22 @@ ReadVal PROC
   ; save finalInteger as userInt
   mov	EDI, [EBP+28]       ; EDI = OFFSET userInt
   mov	[EDI], EBX		    ; userInt = EBX
+
+  ; save the number of digits in this number
+  push  EAX
+  mov   EAX, [EBP+24]       ; EAX = OFFSET charsEntered
+  mov   EBX, [EAX]          ; digitCount = charsEntered
+  mov   digitCount, EBX
+  cmp   hasSign, 1          ; compare hasSign to 1 (true)
+  pop   EAX
+  jne   _saveDigitCount     ; if hasSign, decrement digit count before saving (to not include the sign)
+  
+  dec   digitCount
+
+  _saveDigitCount:
+  mov   EDI, [EBP+32]       ; charLengths (pointed to the right index by caller)
+  mov   EBX, digitCount
+  mov   [EDI], EBX          ; charLengths (at index) = digitCount
 
   pop   EDI
   pop   ESI
