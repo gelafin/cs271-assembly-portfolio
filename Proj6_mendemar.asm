@@ -8,8 +8,8 @@ TITLE "String Primitives and Macros"     (Proj6_mendemar.asm)
 ; Description: displays a list of validated user integers, with their sum and average
 
 INCLUDE Irvine32.inc
-MAXSIZE = 30							; max chars/bytes of user string, including null terminator
-
+MAXSIZE     = 30							; max chars/bytes of user string, including null terminator
+TESTCOUNT   = 10                            ; length of userInts array and loop counter for testing
 
 mDisplayString MACRO stringOffset:REQ
   mov	EDX, stringOffset
@@ -76,9 +76,11 @@ userString		BYTE	MAXSIZE DUP(?)
 userStringSize	DWORD	LENGTHOF userString															; size including null terminator
 invalidErrorMsg	BYTE	"ERROR: You did not enter a signed number or your number was too big.",10,13,0
 tryAgain		BYTE	"Please try again: ",0
-userInt			SDWORD	?																			; int value after conversion from string
+userInt 		SDWORD	?																	        ; int value after conversion from string
 charsEntered	DWORD	?																			; how many characters the user entered
 isNegative		DWORD	?
+
+userInts        SDWORD  TESTCOUNT DUP(?)                                                            ; used for testing
 
 negativeSign    BYTE    45,0
 userStringOut	BYTE	MAXSIZE DUP(?)
@@ -91,7 +93,11 @@ thanks			BYTE	"Thanks for playing! I had so much fun",0
 
 .code
 main PROC
-  ; TODO: loop 10 times to get 10 valid inputs
+  ; get 10 valid inputs
+  mov  ECX, TESTCOUNT
+  mov  EDI, OFFSET userInts
+
+  _testRead:
   ; get valid number from user
   push OFFSET isNegative
   push OFFSET userInt
@@ -101,6 +107,16 @@ main PROC
   push userStringSize
   push OFFSET userString
   call ReadVal
+
+  ; append userInt to array
+  push EAX
+  mov  EAX, userInt
+  mov  [EDI], EAX
+  pop  EAX
+
+  ; maintain test loop
+  add  EDI, SIZE userInts               ; move userInts pointer to next element
+  loop _testRead
 
   ; convert DWORD integer to ASCII string and print
   call CrLf
@@ -229,11 +245,11 @@ WriteVal ENDP
 ;	[ebp+16] = OFFSET invalidErrorMsg
 ;	[ebp+20] = OFFSET prompt
 ;	[ebp+24] = OFFSET charsEntered
-;	[ebp+28] = OFFSET userInt
+;	[ebp+28] = OFFSET userInt: SDWORD to store integer entered by user
 ;	[ebp+32] = OFFSET isNegative: to be assigned 1 if value is negative; 0 otherwise
 ;
 ; Returns:
-;	userInt SDWORD = integer entered by user TODO: should append to an array of SDWORDs instead
+;	userInt SDWORD = integer entered by user
 ; ---------------------------------------------------------------------------------
 ReadVal PROC
   local hasSign:BYTE
@@ -292,16 +308,12 @@ ReadVal PROC
   lodsb					    ; start loop at next char, beause first char's check is complete
   dec	ECX
 
-  ; VALDIATE: now that ESI points to first number, count the digits 
-  ; ESI+charsEntered = lastDigit
-  ; lastDigit - ESI = digits
-  ; if hasSign, dec digits to account for sign, since only digits are to be counted
-
-
-  ; if digits > 10 (max digits of a SDWORD), _invalidInput
-
-
-  ; if 
+  ; TODO: validate not out of bounds. Try using SQWORD and just jge 2^31-1
+  ; else, VALDIATE: now that ESI points to first number, count the digits OR use SQWORD
+  ;   ESI+charsEntered = lastDigit
+  ;   lastDigit - ESI = digits
+  ;   if hasSign, dec digits to account for sign, since only digits are to be counted
+  ;   if digits > 10 (max digits of a SDWORD), can short circuit to _invalidInput
 
   ; convert the rest of the string to number form
   _buildInt:
