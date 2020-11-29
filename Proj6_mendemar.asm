@@ -130,7 +130,7 @@ main PROC
   ; prepare for loop
   mov  ESI, OFFSET userInts                ; ESI = array of numbers to print
   mov  ECX, TESTCOUNT
-
+  mov  EDI, OFFSET userStringOut
   mov  EBX, OFFSET charLengths
   _testWrite:
     ; userInt = [ESI]. For test
@@ -143,8 +143,8 @@ main PROC
 
     ; convert userInt to ASCII string and print
     push OFFSET negativeSign
-    push OFFSET userStringOut
-    push digitsEntered                       ; already accounts for not including sign
+    push EDI                               ; EDI == OFFSET userStringOut
+    push digitsEntered                     ; already accounts for not including sign
     push userInt
     call WriteVal
 
@@ -158,6 +158,14 @@ main PROC
     ; maintain test loop
     add  ESI, TYPE userInts               ; move userInts pointer to next element
     add  EBX, TYPE charLengths            ; move charLengths pointer to next element
+
+    mov  EAX, 0                           ; prepare preconditions for rep stosd
+    push ECX
+    mov  ECX, LENGTHOF userStringOut      ; prepare preconditions for rep stosd
+    rep  stosd                            ; clear userStringOut to make sure old digits aren't written by mDisplayString
+    pop  ECX
+    mov  EDI, OFFSET userStringOut        ; reset userStringOut pointer to first element, after rep stosd moved it to the end
+
     loop _testWrite
 
 
@@ -174,7 +182,9 @@ main ENDP
 ;
 ; prints a given integer to the terminal
 ;
-; Preconditions: integer is validated
+; Preconditions: 
+;   integer is validated
+;   all elements of userStringOut are clear
 ;
 ; Postconditions:
 ;	userStringOut = string of ascii codes representing the integer param
@@ -200,7 +210,6 @@ WriteVal PROC
 
   mov	ECX, [EBP+12]           ; ECX = charsEntered (including "-" if any)
   mov	EDI, [EBP+16]		    ; EDI = OFFSET userStringOut
-  mov   [EDI], DWORD PTR 0      ; clear userStringOut to make sure old digits aren't written by mDisplayString
   add   EDI, digitsEntered	    ; move pointer to prepare for writing backwards
   dec   EDI				     	; EDI was already pointing at the first element before adding charsEntered
 
