@@ -106,6 +106,56 @@ mConvertIntToString MACRO userInt:REQ, userStringOutOffset:REQ, digitsEntered:RE
 
 ENDM
 
+mGetDigitCount MACRO integer:REQ, digitCountOffset:REQ
+  LOCAL _countDigitsOfNegative, _countDigitsOfPositive, _gotDigitCount, digits
+  push EAX
+  push EBX
+  push ECX
+  push EDI
+
+  mov  ECX, 10                           ; maximum of 10 digits in a 32-bit mem
+  mov  digits, 1                         ; sum guaranteed to have at least 1 digit
+  mov  EAX, -9                           ; comparator (changed to start at 9 for positive sum)
+
+  cmp  integer, 0
+  jl   _countDigitsOfNegative            ; if sum is negative, _countDigitsOfNegative
+  mov  EAX, 9                            ; else, sum is positive; start comparing from 9
+
+  _countDigitsOfPositive:
+  cmp  integer, EAX
+  jle  _gotDigitCount                    ; break if number of digits is known
+  
+  ; maintain loop
+  inc  digits
+  
+  mov  EBX, 10                           ; add a 9 digit to comparator (multiply by 10 and add 9)
+  mul  EBX
+  add  EAX, 9
+
+  loop _countDigitsOfPositive
+
+  _countDigitsOfNegative:
+    cmp  integer, EAX
+    jg   _gotDigitCount                 ; break if number of digits is known
+
+    ; maintain loop
+    inc  digits
+  
+    mov  EBX, 10                          ; add a 9 digit to comparator (multiply by 10 and sub 9)
+    mul  EBX
+    sub  EAX, 9
+
+  _gotDigitCount:
+  ; return the digit count
+  mov   EDI, digitCountOffset
+  mov   [EDI], digits
+
+  pop   EDI
+  pop   ECX
+  pop   EBX
+  pop   EAX
+ENDM
+
 .data
 header			BYTE	"PROGRAMMING ASSIGNMENT 6: Designing low-level I/O procedures",10,13
 				BYTE	"Programmed by Mark Mendez",10,13,10,13,0									
@@ -131,6 +181,7 @@ negativeSign    BYTE    45,0
 userStringOut	BYTE	MAXSIZE DUP(?)
 
 sum             SDWORD  ?
+average         SDWORD  ?
 
 youEntered		BYTE	"You entered the following numbers: ",0
 theSumIs		BYTE	"The sum of these numbers is: ",0
@@ -220,41 +271,8 @@ main PROC
   call sumArray
 
   ; get number of digits in sum
-  mov  ECX, 10                           ; maximum of 10 digits in a 32-bit mem
-  mov  digitsEntered, 1                  ; sum guaranteed to have at least 1 digit
-  mov  EAX, -9                           ; comparator (changed to start at 9 for positive sum)
-
-  ; TODO:* if sum <= 9, it has 1 digit, break. Else, mul comparator by 10, add 9 & inc digitCount and do it again
-  ;    also need a version for negatives that does everything opposite
-  cmp  sum, 0
-  jl   _countDigitsOfNegative            ; if sum is negative, _countDigitsOfNegative
-  mov  EAX, 9
-
-  _countDigitsOfPositive:
-  cmp  sum, EAX
-  jle  _gotDigitCount1                   ; break if number of digits is known
+  mGetDigitCount sum, OFFSET digitsEntered
   
-  ; maintain loop
-  inc  digitsEntered
-  
-  mov  EBX, 10                           ; add a 9 digit to comparator (multiply by 10 and add 9)
-  mul  EBX
-  add  EAX, 9
-
-  loop _countDigitsOfPositive
-
-  _countDigitsOfNegative:
-    cmp  sum, EAX
-    jg   _gotDigitCount1
-
-    ; maintain loop
-    inc  digitsEntered
-  
-    mov  EBX, 10                           ; add a 9 digit to comparator (multiply by 10 and sub 9)
-    mul  EBX
-    sub  EAX, 9
-
-  _gotDigitCount1:
   ; print the sum
   call CrLf
   call CrLf
@@ -263,11 +281,30 @@ main PROC
 
   push OFFSET negativeSign
   push OFFSET userStringOut
-  push OFFSET digitsEntered
+  push OFFSET digitsEntered              ; obtained above in mGetDigitCount
   push sum
   call WriteVal
 
-  ; TODO:* print the average of userInts (sum/TESTCOUNT) and can ignore remainder
+  ; calculate average of userInts
+  mov  EAX, sum
+  mov  EBX, TESTCOUNT
+  div  EBX
+  mov  average, EAX                       ; average = sum // TESTCOUNT
+
+  ; get digit count of average
+  mGetDigitCount average, OFFSET digitsEntered
+
+  ; print average
+  call CrLf
+  call CrLf
+  mov  EDX, OFFSET theAvgIs
+  call WriteString
+
+  push OFFSET negativeSign
+  push OFFSET userStringOut               ; TODO: need to clear?
+  push OFFSET digitsEntered               ; obtained above in mGetDigitCount
+  push average
+  call WriteVal
 
   ; print goodbye message
   call CrLf
