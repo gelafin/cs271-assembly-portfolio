@@ -87,6 +87,8 @@ separator       BYTE    ", ",0
 negativeSign    BYTE    45,0
 userStringOut	BYTE	MAXSIZE DUP(?)
 
+sum             SDWORD  ?
+
 youEntered		BYTE	"You entered the following numbers: ",0
 theSumIs		BYTE	"The sum of these numbers is: ",0
 theAvgIs		BYTE	"The rounded average is: ",0
@@ -168,7 +170,16 @@ main PROC
 
     loop _testWrite
 
+  ; sum the userInts
+  push OFFSET sum
+  push LENGTHOF userInts
+  push OFFSET userInts
+  call sumArray
 
+  ; print the sum
+
+
+  ; print the average of userInts (see project 3)
 
   ; print goodbye message
   call CrLf
@@ -177,6 +188,61 @@ main PROC
 
   Invoke ExitProcess,0	; exit to operating system
 main ENDP
+; ---------------------------------------------------------------------------------
+; Name: sumArray
+;
+; prints the sum of numbers in a given integer array to the terminal
+;
+; Preconditions: 
+;   integers are validated
+;   total sum of integers fits inside a 32-bit SDWORD
+;
+; Postconditions:
+;	userStringOut = string of ascii codes representing the integer param
+;
+; Receives:
+;   [ebp+8]  = OFFSET userInts: offset of array of integers to print
+;   [ebp+12] = LENGTHOF userInts: number of elements in userInts
+;   [ebp+16] = OFFSET sum: SDWORD to store sum of integers
+;
+; Returns:
+;   [ebp+16] = sum of integers
+;
+; ---------------------------------------------------------------------------------
+sumArray PROC
+local total:SDWORD
+  ; local directive executes...
+  ;   push	EBP
+  ;   mov	EBP, ESP
+  push  EAX
+  push  EBX
+  push  ECX
+  push  ESI
+
+  mov   ESI, [EBP+8]        ; ESI = OFFSET userInts
+  mov   ECX, [EBP+12]       ; ECX = LENGTHOF userInts
+  mov   EBX, 0              ; initialize de facto accumulator
+  ; loop through ESI, adding each userInt to EAX
+  _next:
+    cld
+    lodsd                   ; EAX = userInts[index]
+    add   EBX, EAX          ; total += userInts[index]
+
+    loop _next
+
+  ; return sum
+  mov   EDI, [EBP+16]       ; EDI = OFFSET sum
+  mov   [EDI], EBX          ; sum = total
+
+  pop   ESI
+  pop   EBX
+  pop   ECX
+  pop   EAX
+  ; local directive executes: pop EBP
+  ret   12
+
+sumArray ENDP
+
 ; ---------------------------------------------------------------------------------
 ; Name: WriteVal
 ;
@@ -398,7 +464,7 @@ ReadVal PROC
   jmp   _maintainLoop
 
   _carryIsSet:
-    cmp   DL, 8             ; this checks for the edge case of -2^31 TODO:* allows numbers past -2^31
+    cmp   DL, 8             ; this checks for the edge case of -2^31 TODO:* allows numbers past -2^31. Should also only allow the 8 in last digit if isNegative, so add that check
     jne   _invalidInput
 
   _maintainLoop:
