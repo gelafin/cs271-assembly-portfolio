@@ -107,53 +107,72 @@ mConvertIntToString MACRO userInt:REQ, userStringOutOffset:REQ, digitsEntered:RE
 ENDM
 
 mGetDigitCount MACRO integer:REQ, digitCountOffset:REQ
-  LOCAL _countDigitsOfNegative, _countDigitsOfPositive, _gotDigitCount, digits
+    LOCAL _countDigitsOfNegative, _countDigitsOfPositive, _gotDigitCount, digits  
+  .data
+    digits  DWORD   0
+  .code
+    push EAX
+    push EBX
+    push ECX
+    push EDI
+
+    mov  ECX, 10                           ; maximum of 10 digits in a 32-bit mem
+    mov  digits, 1                         ; sum guaranteed to have at least 1 digit
+    mov  EAX, -9                           ; comparator (changed to start at 9 for positive sum)
+
+    cmp  integer, 0
+    jl   _countDigitsOfNegative            ; if sum is negative, _countDigitsOfNegative
+    mov  EAX, 9                            ; else, sum is positive; start comparing from 9
+
+    _countDigitsOfPositive:
+      cmp  integer, EAX
+      jle  _gotDigitCount                  ; break if number of digits is known
+  
+      ; maintain loop
+      inc  digits
+  
+      mov  EBX, 10                          ; add a 9 digit to comparator (multiply by 10 and add 9)
+      mul  EBX
+      add  EAX, 9
+
+      loop _countDigitsOfPositive
+
+    _countDigitsOfNegative:
+      cmp  integer, EAX
+      jg   _gotDigitCount                   ; break if number of digits is known
+
+      ; maintain loop
+      inc  digits
+  
+      mov  EBX, 10                          ; add a 9 digit to comparator (multiply by 10 and sub 9)
+      mul  EBX
+      sub  EAX, 9
+
+    _gotDigitCount:
+      ; return the digit count
+      mov   EDI, digitCountOffset
+      mov   EAX, digits
+      mov   [EDI], EAX
+
+    pop   EDI
+    pop   ECX
+    pop   EBX
+    pop   EAX
+ENDM
+
+mClearArray MACRO arrayOffset, arrayLength
   push EAX
-  push EBX
   push ECX
-  push EDI
 
-  mov  ECX, 10                           ; maximum of 10 digits in a 32-bit mem
-  mov  digits, 1                         ; sum guaranteed to have at least 1 digit
-  mov  EAX, -9                           ; comparator (changed to start at 9 for positive sum)
+  ; prepare preconditions for rep stosb
+  mov  EAX, 0
+  mov  ECX, arrayLength
 
-  cmp  integer, 0
-  jl   _countDigitsOfNegative            ; if sum is negative, _countDigitsOfNegative
-  mov  EAX, 9                            ; else, sum is positive; start comparing from 9
+  ; clear all elements of userStringOut
+  rep  stosb
 
-  _countDigitsOfPositive:
-  cmp  integer, EAX
-  jle  _gotDigitCount                    ; break if number of digits is known
-  
-  ; maintain loop
-  inc  digits
-  
-  mov  EBX, 10                           ; add a 9 digit to comparator (multiply by 10 and add 9)
-  mul  EBX
-  add  EAX, 9
-
-  loop _countDigitsOfPositive
-
-  _countDigitsOfNegative:
-    cmp  integer, EAX
-    jg   _gotDigitCount                 ; break if number of digits is known
-
-    ; maintain loop
-    inc  digits
-  
-    mov  EBX, 10                          ; add a 9 digit to comparator (multiply by 10 and sub 9)
-    mul  EBX
-    sub  EAX, 9
-
-  _gotDigitCount:
-  ; return the digit count
-  mov   EDI, digitCountOffset
-  mov   [EDI], digits
-
-  pop   EDI
-  pop   ECX
-  pop   EBX
-  pop   EAX
+  pop  ECX
+  pop  EAX
 ENDM
 
 .data
@@ -254,14 +273,7 @@ main PROC
     ; maintain test loop
     add  ESI, TYPE userInts               ; move userInts pointer to next element
     add  EBX, TYPE charLengths            ; move charLengths pointer to next element
-
-    mov  EAX, 0                           ; prepare preconditions for rep stosb
-    push ECX
-    mov  ECX, LENGTHOF userStringOut      ; prepare preconditions for rep stosb
-    rep  stosb                            ; clear userStringOut to make sure old digits aren't written by mDisplayString
-    pop  ECX
-    mov  EDI, OFFSET userStringOut        ; reset userStringOut pointer to first element, after rep stosd moved it to the end
-
+    mClearArray OFFSET userStringOut, LENGTHOF userStringOut
     loop _testWrite
 
   ; sum the userInts
@@ -270,9 +282,9 @@ main PROC
   push OFFSET userInts
   call sumArray
 
-  ; get number of digits in sum
+  ; get digit count of sum
   mGetDigitCount sum, OFFSET digitsEntered
-  
+
   ; print the sum
   call CrLf
   call CrLf
@@ -288,11 +300,15 @@ main PROC
   ; calculate average of userInts
   mov  EAX, sum
   mov  EBX, TESTCOUNT
-  div  EBX
+  cdq
+  idiv  EBX
   mov  average, EAX                       ; average = sum // TESTCOUNT
 
   ; get digit count of average
   mGetDigitCount average, OFFSET digitsEntered
+
+  ; clear userStringOut to prepare for another WriteVal
+  mClearArray OFFSET userStringOut, LENGTHOF userStringOut
 
   ; print average
   call CrLf
@@ -301,7 +317,7 @@ main PROC
   call WriteString
 
   push OFFSET negativeSign
-  push OFFSET userStringOut               ; TODO: need to clear?
+  push OFFSET userStringOut               ; TODO:* need to clear? Yes
   push OFFSET digitsEntered               ; obtained above in mGetDigitCount
   push average
   call WriteVal
