@@ -343,14 +343,10 @@ ReadVal PROC
   lodsb					    ; start loop at next char, beause first char's check is complete
   dec	ECX
 
-  ; TODO: validate not out of bounds. Try using SQWORD and just jge 2^31-1
-  ; else, VALDIATE: now that ESI points to first number, count the digits OR use SQWORD
-  ;   ESI+charsEntered = lastDigit
-  ;   lastDigit - ESI = digits
-  ;   if hasSign, dec digits to account for sign, since only digits are to be counted
-  ;   if digits > 10 (max digits of a SDWORD), can short circuit to _invalidInput
+  ; TODO:* if bounds validation in below TODO fails, use VALDIATE: now that ESI is past sign, validate the rest of the string by comparing each digit's ascii code to the boundary numbers' ascii codes
+  ;   Then, pop ESI pointer
 
-  ; convert the rest of the string to number form
+  ; convert the digits in the string to number form
   _buildInt:
   ; first char already loaded into AL for first iteration
 
@@ -369,9 +365,8 @@ ReadVal PROC
   jmp	_getUserString      ; go all the way back to square 1 and _getUserString afresh
 
   _validInput:
-  ; TODO: make this loop into a helper function convertAsciiToInt
-
-  ; ascii value is for an integer. Convert it, append it, and loop to next char  
+  ; ASCII value is for an integer
+  ; Convert ascii value, append it, and loop to next char  
   ; convert via: finalInteger = 10 * finalInteger + (asciiValue - 48)
     ; AL = asciiValue of next char of userString
     ; EBX = finalInteger
@@ -386,7 +381,6 @@ ReadVal PROC
   mul	EBX				    ; EAX = EBX * 10
 
   ; VALIDATE: MUL increases total, so make sure result fits in 32-bit reg/mem
-  jo    _invalidInput
   jc    _invalidInput
 
   mov	EBX, EAX		    ; EBX = EAX
@@ -399,13 +393,17 @@ ReadVal PROC
   pop	EBX
   add	EBX, EDX		    
 
-  ; VALIDATE: ADD increases total, so make sure result fits in 32-bit reg/mem
-  jo    _invalidInput
-  jc    _invalidInput
+  ; VALIDATE: ADD increases total at LSB, so make sure result fits in 32-bit reg/mem
+  jc    _carryIsSet
+  jmp   _maintainLoop
 
-  ; maintain loop
-  cld					    ; iterate left to right
-  lodsb				        ; MOV AL, [ESI] then inc ESI
+  _carryIsSet:
+    cmp   DL, 8             ; this checks for the edge case of -2^31 TODO:* allows numbers past -2^31
+    jne   _invalidInput
+
+  _maintainLoop:
+    cld					    ; iterate left to right
+    lodsb				    ; MOV AL, [ESI] then inc ESI
 
   loop _buildInt
 
