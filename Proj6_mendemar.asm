@@ -222,16 +222,23 @@ main PROC
   ; get number of digits in sum
   mov  ECX, 10                           ; maximum of 10 digits in a 32-bit mem
   mov  digitsEntered, 1                  ; sum guaranteed to have at least 1 digit
-  
-  ; TODO:* have to count digits with math. if sum > 999,999,999, it has 10 digits, break. Else, divide comparator by 10/dec digitCount and do it again
-  ;    also need a version for negatives that does everything opposite
-  
-  _countDigitsOfPositive:
+  mov  EAX, 9                            ; comparator
 
-  jg   _gotDigitCount1                   ; break if digits are known
+  ; TODO:* if sum <= 9, it has 1 digit, break. Else, mul comparator by 10, add 9 & inc digitCount and do it again
+  ;    also need a version for negatives that does everything opposite
+  cmp  sum, 0
+  jl   _countDigitsOfNegative            ; if sum is negative, _countDigitsOfNegative
+
+  _countDigitsOfPositive:
+  cmp  sum, EAX
+  jle  _gotDigitCount1                   ; break if number of digits is known
   
   ; maintain loop
-  dec  digitsEntered
+  inc  digitsEntered
+  
+  mov  EBX, 10                           ; add a 9 digit to comparator (multiply by 10 and add 9)
+  mul  EBX
+  add  EAX, 9
 
   loop _countDigitsOfPositive
 
@@ -240,8 +247,9 @@ main PROC
     ; TODO:* see above note
 
   _gotDigitCount1:
-
   ; print the sum
+  call CrLf
+  call CrLf
   mov  EDX, OFFSET theSumIs
   call WriteString
 
@@ -251,7 +259,7 @@ main PROC
   push sum
   call WriteVal
 
-  ; TODO:* print the average of userInts (see project 3)
+  ; TODO:* print the average of userInts (sum/TESTCOUNT) and can ignore remainder
 
   ; print goodbye message
   call CrLf
