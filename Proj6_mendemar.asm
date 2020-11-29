@@ -163,6 +163,7 @@ ENDM
 mClearArray MACRO arrayOffset, arrayLength
   push EAX
   push ECX
+  push EDI
 
   ; prepare preconditions for rep stosb
   mov  EAX, 0
@@ -171,6 +172,7 @@ mClearArray MACRO arrayOffset, arrayLength
   ; clear all elements of userStringOut
   rep  stosb
 
+  pop  EDI
   pop  ECX
   pop  EAX
 ENDM
