@@ -16,7 +16,7 @@ mDisplayString MACRO stringOffset:REQ
   call	WriteString
 ENDM
 
-mGetString	MACRO userStringOffset:REQ, userStringSize:REQ, invalidInputMsgOffset:REQ, promptOffset, charsEnteredOffset
+mGetString	MACRO userStringOffset:REQ, userStringSize:REQ, invalidInputMsgOffset:REQ, promptOffset:REQ, charsEnteredOffset:REQ
   LOCAL _getUserString, _gotValidInput
 
   ; preserve registers
@@ -61,6 +61,51 @@ mGetString	MACRO userStringOffset:REQ, userStringSize:REQ, invalidInputMsgOffset
   pop	EDX
   pop   ECX
   pop	EAX
+ENDM
+
+mConvertIntToString MACRO userInt:REQ, userStringOutOffset:REQ, digitsEntered
+  LOCAL _convertNext
+
+  push  EAX
+  push  EBX
+  push  ECX
+  push  ESI
+  push  EDI
+
+  mov	ECX, digitsEntered        ; ECX = digitsEntered (excluding "-" if any)
+  mov	EDI, [EBP+16]		      ; EDI = OFFSET userStringOut
+  add   EDI, [ESI]	              ; move pointer to prepare for writing backwards TODO:* here as well needs to happen after macro
+  dec   EDI				     	  ; EDI was already pointing at the first element before adding charsEntered
+
+  mov   EAX, userInt		      ; EAX = the first number to divide
+  mov   EDI, userStringOutOffset  ; EDI = offset of byte array return value
+  mov   EBX, digitsEnteredOffset  ; EBX = digitsEnteredOffset
+  mov   ECX, [EBX]
+
+  ; divide the param by 10. Quotient is the next thing to be divided, and remainder is the rightmost digit  
+  ; EAX is the first number to divide
+  _convertNext:  
+    mov   EBX, 10
+    cdq
+    idiv  EBX					    ; now EAX contains the next thing to divide, and EDX contains rightmost digit
+
+    push  EAX					    ; save next number to divide
+    mov   AL, DL				    ; no data is lost, because each converted result is only 1 byte
+    add	  AL, '0'			        ; convert to string
+
+    ; AL contains ASCII value to be appended to the BYTE array string
+    ; store AL into EDI (from right to left using std)
+    std
+    stosb						    ; [EDI] = digitChar, then EDI--
+
+    pop	  EAX					    ; restore next number to divide
+    loop  _convertNext
+
+  pop   EAX
+  pop   EBX
+  pop   ECX
+  pop   EDI
+
 ENDM
 
 .data
@@ -146,7 +191,7 @@ main PROC
     ; convert userInt to ASCII string and print
     push OFFSET negativeSign
     push EDI                               ; EDI == OFFSET userStringOut
-    push digitsEntered                     ; already accounts for not including sign
+    push OFFSET digitsEntered                     ; already accounts for not including sign
     push userInt
     call WriteVal
 
@@ -161,10 +206,10 @@ main PROC
     add  ESI, TYPE userInts               ; move userInts pointer to next element
     add  EBX, TYPE charLengths            ; move charLengths pointer to next element
 
-    mov  EAX, 0                           ; prepare preconditions for rep stosd
+    mov  EAX, 0                           ; prepare preconditions for rep stosb
     push ECX
-    mov  ECX, LENGTHOF userStringOut      ; prepare preconditions for rep stosd
-    rep  stosd                            ; clear userStringOut to make sure old digits aren't written by mDisplayString
+    mov  ECX, LENGTHOF userStringOut      ; prepare preconditions for rep stosb
+    rep  stosb                            ; clear userStringOut to make sure old digits aren't written by mDisplayString
     pop  ECX
     mov  EDI, OFFSET userStringOut        ; reset userStringOut pointer to first element, after rep stosd moved it to the end
 
@@ -176,10 +221,39 @@ main PROC
   push OFFSET userInts
   call sumArray
 
+  ; get number of digits in sum
+  mov  ECX, 10                           ; maximum of 10 digits in a 32-bit mem
+  mov  digitsEntered, 1                  ; sum guaranteed to have at least 1 digit
+  
+  ; TODO:* have to count digits with math. if sum > 999,999,999, it has 10 digits, break. Else, divide comparator by 10/dec digitCount and do it again
+  ;    also need a version for negatives that does everything opposite
+  
+  _countDigitsOfPositive:
+
+  jg   _gotDigitCount1                   ; break if digits are known
+  
+  ; maintain loop
+  dec  digitsEntered
+
+  loop _countDigitsOfPositive
+
+  _countDigitsOfNegative:
+
+    ; TODO:* see above note
+
+  _gotDigitCount1:
+
   ; print the sum
+  mov  EDX, OFFSET theSumIs
+  call WriteString
 
+  push OFFSET negativeSign
+  push OFFSET userStringOut
+  push OFFSET digitsEntered
+  push sum
+  call WriteVal
 
-  ; print the average of userInts (see project 3)
+  ; TODO:* print the average of userInts (see project 3)
 
   ; print goodbye message
   call CrLf
@@ -257,7 +331,7 @@ sumArray ENDP
 ;
 ; Receives:
 ;   [ebp+8]  SDWORD = integer to print (32 bits or fewer)
-;	[ebp+12] DWORD  = digitsEntered: number of digits in integer to print
+;	[ebp+12] DWORD  = OFFSET digitsEntered: number of digits in integer to print
 ;	[ebp+16] DWORD  = OFFSET userStringOut
 ;   [ebp+20] DWORD  = OFFSET negativeSign: memory location of ascii code of negative sign
 ;
@@ -272,65 +346,45 @@ WriteVal PROC
   push	EBX
   push  ECX
   push	EDX
+  push  ESI
   push	EDI
-
-  mov	ECX, [EBP+12]           ; ECX = charsEntered (including "-" if any)
-  mov	EDI, [EBP+16]		    ; EDI = OFFSET userStringOut
-  add   EDI, digitsEntered	    ; move pointer to prepare for writing backwards
-  dec   EDI				     	; EDI was already pointing at the first element before adding charsEntered
 
   ; check if userInt is negative
   cmp   userInt, 0
-  jge   _numberIsPositive	    ; number is positive! Move on and convert to string
+  jge   _numberIsPositive	              ; number is positive! Move on and convert to string
 
   ; number is negative; undo processing from earlier and assign 2's comp to EAX
   ; print a negative sign
-  mov	EDX, [EBP+20]		    ; EDX = (ascii for "-")
+  mov	EDX, [EBP+20]		              ; EDX = (ascii for "-")
   call	WriteString
-
-  ; decrement loop counter and userStringOut pointer to account for not including the negative sign. TODO: remove?
-;  dec   ECX
-;  dec   EDI
 
   ; convert negative number to positive by subtracting from 0 TODO: need to use 0 - QWORD mem operand, not register. Asked about SBB
   ; if no SBB, make an absoluteValue proc to... 
   ;   1. apply two's comp (invert bits, then add 1)
   ;   2. clear the first bit and read back as a number
 
-  mov   EAX, 0      		    ; EAX = 0
-  mov   EBX, [EBP+8]            ; EBX = userInt
-  sub   EAX, EBX                ; EAX = 0 - userInt
+  mov   EAX, 0      		              ; EAX = 0
+  mov   EBX, [EBP+8]                      ; EBX = userInt
+  sub   EAX, EBX                          ; EAX = 0 - userInt
 
   ; skip numberIsPositive section
-  jmp _convertNext
+  jmp _convertToString
 
   ; else, it's already positive, so assign directly to EAX
   _numberIsPositive:
-    mov   EAX, [EBP+8]		    ; EAX = the first number to divide
+  mov   EAX, [EBP+8]		    ; EAX = the first number to divide
 
-  ; divide the param by 10. Quotient is the next thing to be divided, and remainder is the rightmost digit  
-  ; EAX is the first number to divide
-  _convertNext:  
-    mov   EBX, 10
-    cdq
-    idiv  EBX					; now EAX contains the next thing to divide, and EDX contains rightmost digit
-
-    push  EAX					; save next number to divide
-    mov   AL, DL				    ; no data is lost, because each converted result is only 1 byte
-    add	  AL, '0'			    ; convert to string
-
-    ; AL contains ASCII value to be appended to the BYTE array string
-    ; store AL into EDI (from right to left using std)
-    std
-    stosb						; [EDI] = digitChar, then EDI--
-
-    pop	  EAX					; restore next number to divide
-    loop  _convertNext
+  _convertToString:
+  push  ESI
+  mov   ESI, [EBP+12]
+  mConvertIntToString EAX, [EBP+16], [ESI]   ; convertIntToString(userInt, OFFSET userStringOut, digitsEntered)
+  pop   ESI
 
   ; print the string
-  mDisplayString [EBP+16]
+  mDisplayString [EBP+16]                 ; mDisplayString(OFFSET userStringOut)
 
   pop	EDI
+  pop   ESI
   pop	EDX
   pop	ECX
   pop	EBX
