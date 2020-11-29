@@ -222,12 +222,13 @@ main PROC
   ; get number of digits in sum
   mov  ECX, 10                           ; maximum of 10 digits in a 32-bit mem
   mov  digitsEntered, 1                  ; sum guaranteed to have at least 1 digit
-  mov  EAX, 9                            ; comparator
+  mov  EAX, -9                           ; comparator (changed to start at 9 for positive sum)
 
   ; TODO:* if sum <= 9, it has 1 digit, break. Else, mul comparator by 10, add 9 & inc digitCount and do it again
   ;    also need a version for negatives that does everything opposite
   cmp  sum, 0
   jl   _countDigitsOfNegative            ; if sum is negative, _countDigitsOfNegative
+  mov  EAX, 9
 
   _countDigitsOfPositive:
   cmp  sum, EAX
@@ -243,8 +244,15 @@ main PROC
   loop _countDigitsOfPositive
 
   _countDigitsOfNegative:
+    cmp  sum, EAX
+    jg   _gotDigitCount1
 
-    ; TODO:* see above note
+    ; maintain loop
+    inc  digitsEntered
+  
+    mov  EBX, 10                           ; add a 9 digit to comparator (multiply by 10 and sub 9)
+    mul  EBX
+    sub  EAX, 9
 
   _gotDigitCount1:
   ; print the sum
