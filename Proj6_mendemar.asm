@@ -63,24 +63,21 @@ mGetString	MACRO userStringOffset:REQ, userStringSize:REQ, invalidInputMsgOffset
   pop	EAX
 ENDM
 
-mConvertIntToString MACRO userInt:REQ, userStringOutOffset:REQ, digitsEntered
+mConvertIntToString MACRO userInt:REQ, userStringOutOffset:REQ, digitsEntered:REQ
   LOCAL _convertNext
 
   push  EAX
   push  EBX
   push  ECX
-  push  ESI
+  push  EDX
   push  EDI
 
-  mov	ECX, digitsEntered        ; ECX = digitsEntered (excluding "-" if any)
-  mov	EDI, [EBP+16]		      ; EDI = OFFSET userStringOut
-  add   EDI, [ESI]	              ; move pointer to prepare for writing backwards TODO:* here as well needs to happen after macro
+  mov   EDI, userStringOutOffset  ; EDI = offset of byte array return value
+  add   EDI, digitsEntered        ; move pointer to prepare for writing backwards
   dec   EDI				     	  ; EDI was already pointing at the first element before adding charsEntered
 
+  mov	ECX, digitsEntered        ; ECX = digitsEntered (excluding "-" if any)
   mov   EAX, userInt		      ; EAX = the first number to divide
-  mov   EDI, userStringOutOffset  ; EDI = offset of byte array return value
-  mov   EBX, digitsEnteredOffset  ; EBX = digitsEnteredOffset
-  mov   ECX, [EBX]
 
   ; divide the param by 10. Quotient is the next thing to be divided, and remainder is the rightmost digit  
   ; EAX is the first number to divide
@@ -101,10 +98,11 @@ mConvertIntToString MACRO userInt:REQ, userStringOutOffset:REQ, digitsEntered
     pop	  EAX					    ; restore next number to divide
     loop  _convertNext
 
-  pop   EAX
-  pop   EBX
-  pop   ECX
   pop   EDI
+  pop   EDX
+  pop   ECX
+  pop   EBX
+  pop   EAX
 
 ENDM
 
