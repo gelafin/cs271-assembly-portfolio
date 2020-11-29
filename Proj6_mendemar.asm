@@ -160,7 +160,7 @@ mGetDigitCount MACRO integer:REQ, digitCountOffset:REQ
     pop   EAX
 ENDM
 
-mClearArray MACRO arrayOffset, arrayLength
+mClearArray MACRO arrayOffset:REQ, arrayLength:REQ
   push EAX
   push ECX
   push EDI
@@ -168,6 +168,7 @@ mClearArray MACRO arrayOffset, arrayLength
   ; prepare preconditions for rep stosb
   mov  EAX, 0
   mov  ECX, arrayLength
+  mov  EDI, arrayOffset
 
   ; clear all elements of userStringOut
   rep  stosb
