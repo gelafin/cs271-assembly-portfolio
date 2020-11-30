@@ -434,29 +434,25 @@ main ENDP
 ; ---------------------------------------------------------------------------------
 ; Name: sumArray
 ;
-; prints the sum of numbers in a given integer array to the terminal
+; Prints the sum of numbers in a given integer array to the terminal
 ;
 ; Preconditions: 
 ;   integers are validated
-;   total sum of integers fits inside a 32-bit SDWORD
-;
-; Postconditions:
-;	userStringOut = string of ascii codes representing the integer param
+;   total sum of integers fits inside an SDWORD
+;   no two successive integers (or successive sums of integers) overflow an SDWORD
 ;
 ; Receives:
-;   [ebp+8]  = OFFSET userInts: offset of array of integers to print
+;   [ebp+8]  = OFFSET userInts: address of array of integers to sum
 ;   [ebp+12] = LENGTHOF userInts: number of elements in userInts
 ;   [ebp+16] = OFFSET sum: SDWORD to store sum of integers
 ;
 ; Returns:
-;   [ebp+16] = sum of integers
+;   [ebp+16] = sum of integers in given array
 ;
 ; ---------------------------------------------------------------------------------
 sumArray PROC
-local total:SDWORD
-  ; local directive executes...
-  ;   push	EBP
-  ;   mov	EBP, ESP
+  push	EBP
+  mov	EBP, ESP
   push  EAX
   push  EBX
   push  ECX
@@ -481,9 +477,8 @@ local total:SDWORD
   pop   EBX
   pop   ECX
   pop   EAX
-  ; local directive executes: pop EBP
+  pop EBP
   ret   12
-
 sumArray ENDP
 
 ; ---------------------------------------------------------------------------------
@@ -496,7 +491,7 @@ sumArray ENDP
 ;   all elements of userStringOut are clear
 ;
 ; Postconditions:
-;	userStringOut = string of ascii codes representing the integer param
+;	userStringOut = reference to a string of ASCII codes representing the given integer
 ;
 ; Receives:
 ;   [ebp+8]  SDWORD = integer to print (32 bits or fewer)
