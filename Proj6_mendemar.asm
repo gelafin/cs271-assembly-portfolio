@@ -1,7 +1,7 @@
 TITLE "String Primitives and Macros"     (Proj6_mendemar.asm)
 
 ; Author: Mark Mendez
-; Last Modified: 11/23/2020
+; Last Modified: 11/29/2020
 ; OSU email address: mendemar@oregonstate.edu
 ; Course number/section: CS271 Section 400
 ; Project Number: 6                Due Date: 12/6/2020
@@ -11,15 +11,42 @@ INCLUDE Irvine32.inc
 MAXSIZE     = 30							; max chars/bytes of user string, including null terminator
 TESTCOUNT   = 10                            ; length of userInts array and loop counter for testing
 
+; ---------------------------------------------------------------------------------
+; Name: mDisplayString
+;
+; Prints a given string to the terminal
+;
+; Receives:
+;   stringOffset = address of array
+; ---------------------------------------------------------------------------------
 mDisplayString MACRO stringOffset:REQ
+  push  EDX
+
   mov	EDX, stringOffset
   call	WriteString
+
+  pop   EDX
 ENDM
 
-mGetString	MACRO userStringOffset:REQ, userStringSize:REQ, invalidInputMsgOffset:REQ, promptOffset:REQ, charsEnteredOffset:REQ
-  LOCAL _getUserString, _gotValidInput
-
-  ; preserve registers
+; ---------------------------------------------------------------------------------
+; Name: mGetString
+;
+; Gets a string of input from the user and saves it to memory
+;
+; Postconditions:
+;   mGetString uses Irvine32::ReadString, so chars may be truncated
+;
+; Receives:
+;   userStringOffset   = address of string array to store input
+;   userStringSize     = DWORD length of userStringOffset
+;   promptOffset       = address of string array prompt to display when asking for user's input
+;   charsEnteredOffset = address of DWORD to store number of characters captured
+;
+; returns: 
+;   [charsEnteredOffset] = number of characters captured
+;   userStringOffset     = reference to string captured
+; ---------------------------------------------------------------------------------
+mGetString	MACRO userStringOffset:REQ, userStringSize:REQ, promptOffset:REQ, charsEnteredOffset:REQ
   push	EAX
   push	ECX
   push	EDX
@@ -31,25 +58,12 @@ mGetString	MACRO userStringOffset:REQ, userStringSize:REQ, invalidInputMsgOffset
   call	WriteString
 
   ; get user string
-  _getUserString:
   mov	EDX, userStringOffset
   mov	ECX, userStringSize
   call	ReadString
   mov	EDI, charsEnteredOffset
   mov	[EDI], EAX
 
-  TODO: ; may not have to validate string length
-  ; if user string is too big (inputCharCount > ECX), get another string
-  ;  cmp	inputCharCount, ECX
-  cmp	EAX, ECX
-  jbe	_gotValidInput
-  
-  ; else, not valid input
-  mov	EDX, invalidInputMsgOffset
-  call	WriteString
-  jmp	_getUserString
-
-  _gotValidInput:
   ; save user string to memory
   mov	ESI, EDX
   mov	EDI, userStringOffset
@@ -63,6 +77,21 @@ mGetString	MACRO userStringOffset:REQ, userStringSize:REQ, invalidInputMsgOffset
   pop	EAX
 ENDM
 
+; ---------------------------------------------------------------------------------
+; Name: mConvertIntToString
+;
+; Converts a given integer value to its ASCII code equivalent
+;
+; Preconditions: integer is validated
+;
+; Receives:
+;   userInt             = DWORD integer to print
+;   userStringOutOffset = address of byte array to use for return
+;   digitsEntered       = DWORD number of digits in userInt
+;
+; returns: 
+;   userStringOutOffset = reference to string of ASCII codes representing userInt's digits
+; ---------------------------------------------------------------------------------
 mConvertIntToString MACRO userInt:REQ, userStringOutOffset:REQ, digitsEntered:REQ
   LOCAL _convertNext
 
@@ -72,30 +101,29 @@ mConvertIntToString MACRO userInt:REQ, userStringOutOffset:REQ, digitsEntered:RE
   push  EDX
   push  EDI
 
-  mov   EDI, userStringOutOffset  ; EDI = offset of byte array return value
+  mov   EDI, userStringOutOffset  ; EDI = address of array return value
   add   EDI, digitsEntered        ; move pointer to prepare for writing backwards
-  dec   EDI				     	  ; EDI was already pointing at the first element before adding charsEntered
+  dec   EDI				     	  ; EDI was already pointing at the first element before adding digitsEntered
 
-  mov	ECX, digitsEntered        ; ECX = digitsEntered (excluding "-" if any)
+  mov	ECX, digitsEntered        ; excludes "-" if any
   mov   EAX, userInt		      ; EAX = the first number to divide
 
-  ; divide the param by 10. Quotient is the next thing to be divided, and remainder is the rightmost digit  
-  ; EAX is the first number to divide
+  ; divide the param by 10. Quotient is the next thing to be divided, and remainder is the rightmost digit
   _convertNext:  
     mov   EBX, 10
     cdq
-    idiv  EBX					    ; now EAX contains the next thing to divide, and EDX contains rightmost digit
+    idiv  EBX					   ; now EAX contains the next thing to divide, and EDX contains rightmost digit
 
-    push  EAX					    ; save next number to divide
-    mov   AL, DL				    ; no data is lost, because each converted result is only 1 byte
-    add	  AL, '0'			        ; convert to string
+    push  EAX
+    mov   AL, DL				   ; no data is lost, because each converted result is only 1 byte
+    add	  AL, '0'			       ; convert to string
 
     ; AL contains ASCII value to be appended to the BYTE array string
     ; store AL into EDI (from right to left using std)
     std
-    stosb						    ; [EDI] = digitChar, then EDI--
+    stosb						   ; [EDI] = digit as char, then EDI--
 
-    pop	  EAX					    ; restore next number to divide
+    pop	  EAX
     loop  _convertNext
 
   pop   EDI
@@ -103,11 +131,24 @@ mConvertIntToString MACRO userInt:REQ, userStringOutOffset:REQ, digitsEntered:RE
   pop   ECX
   pop   EBX
   pop   EAX
-
 ENDM
 
+; ---------------------------------------------------------------------------------
+; Name: mGetDigitCount
+;
+; Counts the number of digits in a given integer and stores the result
+;
+; Preconditions: integer is validated
+;
+; Receives:
+;   integer          = DWORD integer whose digits need counting
+;   digitCountOffset = address of DWORD to store number of digits in integer
+;
+; returns: 
+;   [digitCountOffset] = number of digits in integer
+; ---------------------------------------------------------------------------------
 mGetDigitCount MACRO integer:REQ, digitCountOffset:REQ
-    LOCAL _countDigitsOfNegative, _countDigitsOfPositive, _gotDigitCount, _notSpecial, digits  
+    LOCAL _countDigitsOfNegative, _countDigitsOfPositive, _gotDigitCount, digits  
   .data
     digits  DWORD   0
   .code
@@ -116,12 +157,6 @@ mGetDigitCount MACRO integer:REQ, digitCountOffset:REQ
     push ECX
     push EDI
 
-    cmp   userInt, -2147483648             ; special treatment for the number that doesn't compare to zero properly
-    jne   _notSpecial
-    mov   digits, 10
-    jmp   _gotDigitCount
-
-    _notSpecial:
     mov  ECX, 10                           ; maximum of 10 digits in a 32-bit mem
     mov  digits, 1                         ; sum guaranteed to have at least 1 digit
     mov  EAX, -9                           ; comparator (changed to start at 9 for positive sum)
@@ -137,7 +172,7 @@ mGetDigitCount MACRO integer:REQ, digitCountOffset:REQ
       ; maintain loop
       inc  digits
   
-      mov  EBX, 10                          ; add a 9 digit to comparator (multiply by 10 and add 9)
+      mov  EBX, 10                         ; add a 9 digit to comparator (multiply by 10 and add 9)
       mul  EBX
       add  EAX, 9
 
@@ -168,6 +203,20 @@ mGetDigitCount MACRO integer:REQ, digitCountOffset:REQ
     pop   EAX
 ENDM
 
+; ---------------------------------------------------------------------------------
+; Name: mClearArray
+;
+; Clears all elements of a given array
+;
+; Preconditions: arrayLength is validated
+;
+; Receives:
+;   arrayOffset = address of array to clear
+;   arrayLength = DWORD length of array to clear
+;
+; returns: 
+;   arrayOffset = reference to a now empty array
+; ---------------------------------------------------------------------------------
 mClearArray MACRO arrayOffset:REQ, arrayLength:REQ
   push EAX
   push ECX
@@ -187,38 +236,41 @@ mClearArray MACRO arrayOffset:REQ, arrayLength:REQ
 ENDM
 
 .data
+; first used in Main
 header			BYTE	"PROGRAMMING ASSIGNMENT 6: Designing low-level I/O procedures",10,13
 				BYTE	"Programmed by Mark Mendez",10,13,10,13,0									
 intro			BYTE	"Please provide 10 signed decimal integers.",10,13							; instructions and explanation of program
 				BYTE	"Each number needs to be small enough to fit inside a 32 bit register. "
 				BYTE	"After you have finished inputting the raw numbers I will display a "
 				BYTE	"list of the integers, their sum, and their average value.",10,13,10,13,0
-
-prompt			BYTE	"Please enter a signed number: ",0
-userString		BYTE	MAXSIZE DUP(?)
-userStringSize	DWORD	LENGTHOF userString															; size including null terminator
-invalidErrorMsg	BYTE	"ERROR: You did not enter a signed number or your number was too big.",10,13,0
-tryAgain		BYTE	"Please try again: ",0
-userInt 		SDWORD	?																	        ; int value after conversion from string
-charsEntered    DWORD   ?                                                                           ; how many characters long a given number is
-charLengths  	DWORD	TESTCOUNT DUP(?)															; how many characters long each number is. TODO: rename to digitLengths
-
-digitsEntered   DWORD   ?                                                                           ; holds a given value of charLengths for testing
-userInts        SDWORD  TESTCOUNT DUP(?)                                                            ; used for testing
-separator       BYTE    ", ",0
-string2EXP31    BYTE    "-2147483648",0
-
-negativeSign    BYTE    45,0
-userStringOut	BYTE	MAXSIZE DUP(?)
-
-sum             SDWORD  ?
-average         SDWORD  ?
-
+userInts        SDWORD  TESTCOUNT DUP(?)                                                            ; array of userInt values
+charLengths  	DWORD	TESTCOUNT DUP(?)															; array of charLenth values
 youEntered		BYTE	"You entered the following numbers: ",0
 theSumIs		BYTE	"The sum of these numbers is: ",0
 theAvgIs		BYTE	"The rounded average is: ",0
-
 thanks			BYTE	"Thanks for playing! I had so much fun",0
+
+; first used in ReadVal
+prompt			BYTE	"Please enter a signed number: ",0
+userString		BYTE	MAXSIZE DUP(?)
+userStringSize	DWORD	LENGTHOF userString															
+invalidErrorMsg	BYTE	"ERROR: You did not enter a signed number or your number was too big.",10,13,0
+tryAgain		BYTE	"Please try again: ",0
+userInt 		SDWORD	?																	        
+charsEntered    DWORD   ?                                                                           ; number of characters (includes sign)
+
+; first used in WriteVal
+digitsEntered   DWORD   ?                                                                           ; number of digits (excludes sign)
+separator       BYTE    ", ",0
+string2EXP31    BYTE    "-2147483648",0
+negativeSign    BYTE    45,0
+userStringOut	BYTE	MAXSIZE DUP(?)
+
+; first used in sumArray
+sum             SDWORD  ?
+
+; first used in averageArray
+average         SDWORD  ?
 
 .code
 main PROC
@@ -526,7 +578,7 @@ ReadVal PROC
 
   ; get user string and save to userString
   _getUserString:
-  mGetString [EBP+8], [EBP+12], [EBP+16], [EBP+20], [EBP+24]
+  mGetString [EBP+8], [EBP+12], [EBP+20], [EBP+24]
   
   ; convert userString to SDWORD int
   mov	ESI, [EBP+24]       ; loop as many times as there are chars in what user entered
