@@ -274,15 +274,28 @@ average         SDWORD  ?
 
 .code
 main PROC
-  ; print header
+; --------------------------
+; Print header
+;
+; --------------------------
   mov  EDX, OFFSET header
   call WriteString
 
-  ; print intro
+; --------------------------
+; Print intro
+;
+; --------------------------
   mov  EDX, OFFSET intro
   call WriteString
 
-  ; get 10 valid inputs
+; --------------------------
+; Test ReadVal by interacting with user to get some (TESTCOUNT) integers.
+;   Validate the integers while getting them, printing an error message if invalid.
+;   Store the validated integers in an array.
+;   Since WriteVal requires knowing the digit count of each number, store the digit
+;   count of each number in another array
+;   
+; --------------------------
   mov  ECX, TESTCOUNT
   mov  EDI, OFFSET userInts
   mov  EBX, OFFSET charLengths
@@ -309,30 +322,35 @@ main PROC
     add  EBX, TYPE charLengths            ; move charLengths pointer to next element
     loop _testRead
 
-  ; print the 10 integers
+; --------------------------
+; Test WriteVal by printing the integers gathered by ReadVal,
+;   using the digit count gathered by ReadVal's loop in Main as
+;   the corresponding argument for WriteVal
+;
+; --------------------------
   call CrLf
   mov  EDX, OFFSET youEntered
   call WriteString
 
   ; prepare for loop
-  mov  ESI, OFFSET userInts                ; ESI = array of numbers to print
+  mov  ESI, OFFSET userInts
   mov  ECX, TESTCOUNT
   mov  EDI, OFFSET userStringOut
   mov  EBX, OFFSET charLengths
+
   _testWrite:
-    ; userInt = [ESI]. For test
     push EAX
     mov  EAX, [ESI]
-    mov  userInt, EAX                      ; userInt = userInts[index]
+    mov  userInt, EAX                     ; userInt = userInts[index]
     mov  EAX, [EBX]
-    mov  digitsEntered, EAX                ; digitsEntered = charLengths[index]. For test
+    mov  digitsEntered, EAX               ; digitsEntered = charLengths[index]
     pop  EAX
 
     ; convert userInt to ASCII string and print
     push OFFSET string2EXP31
     push OFFSET negativeSign
-    push EDI                               ; EDI == OFFSET userStringOut
-    push OFFSET digitsEntered                     ; already accounts for not including sign
+    push EDI                              ; EDI == OFFSET userStringOut
+    push OFFSET digitsEntered             ; already accounts for not including sign
     push userInt
     call WriteVal
 
@@ -343,13 +361,16 @@ main PROC
     call WriteString
 
     _noSeparator:
-    ; maintain test loop
-    add  ESI, TYPE userInts               ; move userInts pointer to next element
-    add  EBX, TYPE charLengths            ; move charLengths pointer to next element
-    mClearArray OFFSET userStringOut, LENGTHOF userStringOut
-    loop _testWrite
+      ; maintain test loop
+      add  ESI, TYPE userInts               ; move userInts pointer to next element
+      add  EBX, TYPE charLengths            ; move charLengths pointer to next element
+      mClearArray OFFSET userStringOut, LENGTHOF userStringOut
+      loop _testWrite
 
-  ; sum the userInts
+; --------------------------
+; Sum the numbers gathered by ReadVal, and print the sum
+;
+; --------------------------
   push OFFSET sum
   push LENGTHOF userInts
   push OFFSET userInts
@@ -367,11 +388,14 @@ main PROC
   push OFFSET string2EXP31
   push OFFSET negativeSign
   push OFFSET userStringOut
-  push OFFSET digitsEntered              ; obtained above in mGetDigitCount
+  push OFFSET digitsEntered               ; obtained above in mGetDigitCount
   push sum
   call WriteVal
 
-  ; calculate average of userInts
+; --------------------------
+; Average the numbers gathered by ReadVal, and print the average
+;
+; --------------------------
   mov  EAX, sum
   mov  EBX, TESTCOUNT
   cdq
@@ -392,12 +416,15 @@ main PROC
 
   push OFFSET string2EXP31
   push OFFSET negativeSign
-  push OFFSET userStringOut               ; TODO:* need to clear? Yes
+  push OFFSET userStringOut               
   push OFFSET digitsEntered               ; obtained above in mGetDigitCount
   push average
   call WriteVal
 
-  ; print goodbye message
+; --------------------------
+; Print goodbye message
+;
+; --------------------------
   call CrLf
   call CrLf
   mDisplayString OFFSET thanks
