@@ -496,7 +496,7 @@ sumArray ENDP
 ; Receives:
 ;   [ebp+8]  = integer:              SDWORD integer to print
 ;	[ebp+12] = OFFSET digitsEntered: address of DWORD number of digits in integer
-;	[ebp+16] = OFFSET userStringOut: address of string to store string version of integer
+;	[ebp+16] = OFFSET userString:    address of string to store string version of integer
 ;   [ebp+20] = OFFSET negativeSign:  address of string representing the negative sign
 ;   [ebp+24] = OFFSET string2EXP31:  address of string representing -2^31 written out
 ;
@@ -567,18 +567,20 @@ WriteVal ENDP
 ; ---------------------------------------------------------------------------------
 ; Name: ReadVal
 ;
-; reads a given SDWORD integer from the terminal, handling + and - signs as appropriate
+; Reads a given SDWORD integer from the terminal, handling + and - signs as appropriate
 ;
-; Preconditions: 
+; Preconditions:
+;   [ebp+32] points to the first empty element of charLengths
+;   mGetString uses Irvine32::ReadString, so chars may be truncated
 ;
 ; Receives:
-;	[ebp+8]  = OFFSET userString
-;	[ebp+12] = LENGTHOF userString
-;	[ebp+16] = OFFSET invalidErrorMsg
-;	[ebp+20] = OFFSET prompt
-;	[ebp+24] = OFFSET charsEntered
-;	[ebp+28] = OFFSET userInt: SDWORD to store integer entered by user
-;   [ebp+32] = OFFSET charLengths (at index to save in): offset of first empty element in DWORD array storing the number of characters in each number
+;	[ebp+8]  = OFFSET userString:      address of string to store string version of integer
+;	[ebp+12] = LENGTHOF userString:    DWORD length of userString
+;	[ebp+16] = OFFSET invalidErrorMsg: address of string representing error message for invalid input
+;	[ebp+20] = OFFSET prompt:          address of string representing prompt message
+;	[ebp+24] = OFFSET charsEntered:    address of DWORD to store number of characters captured
+;	[ebp+28] = OFFSET userInt:         address of SDWORD to store integer entered by user
+;   [ebp+32] = OFFSET charLengths:     offset of first *empty* element in DWORD array storing the number of characters in each number
 ;
 ; Returns:
 ;	userInt SDWORD = integer entered by user
@@ -596,17 +598,17 @@ ReadVal PROC
   push	ESI
   push	EDI
 
-  ; get user string and save to userString
   _getUserString:
+  ; get user string and save to userString
   mGetString [EBP+8], [EBP+12], [EBP+20], [EBP+24]
   
   ; convert userString to SDWORD int
-  mov	ESI, [EBP+24]       ; loop as many times as there are chars in what user entered
+  mov	ESI, [EBP+24]       
   mov	ECX, [ESI]		    ; ECX = charsEntered
-  mov	EBX, 0			    ; tracks finalInteger
-  mov	ESI, [EBP+8]	    ; ESI = OFFSET userString
-  cld					    ; starting from the msb
-  lodsb					    ; MOV AL, [ESI] then increment (due to cld) ESI
+  mov	EBX, 0			    ; tracks final integer value
+  mov	ESI, [EBP+8]	    
+  cld					    
+  lodsb					    ; MOV AL, [ESI] then increment ESI
 
   ; got the first ascii value in AL
   ; VALIDATE: check if the first char is a +/- sign
@@ -627,85 +629,83 @@ ReadVal PROC
   ; if not negative, leave isNegative clear and _buildInt
   jne	_buildInt
 
-  ; else, it is negative. Set isNegative and _buildInt. Final step will be to convert from positive to negative by 0 - value
+  ; else, it is negative. Set isNegative and _buildInt. Final step will be to convert from positive to negative
   mov   hasSign, 1          ; hasSign = 1 (true)
   mov   isNegative, 1       ; isNegative = 1 (true)
   cld
   lodsb					    ; start loop at next char, beause first char's check is complete
   dec	ECX
 
-  ; TODO:* if bounds validation in below TODO fails, use VALDIATE: now that ESI is past sign, validate the rest of the string by comparing each digit's ascii code to the boundary numbers' ascii codes
-  ;   Then, pop ESI pointer
+  ; Note: alternate validation to the method below can go here: now that ESI is past sign, compare each digit's ascii code 
+  ;     to the boundary numbers' ascii codes
+  ;     Then, pop ESI pointer
 
   ; convert the digits in the string to number form
-  _buildInt:
   ; first char already loaded into AL for first iteration
+  _buildInt:
+    ; VALIDATE: is it a number (between 48-57 in ASCII)?
+    cmp AL, 48			    ; is it less than 48?
+    jl	_invalidInput
 
-  ; VALIDATE: is it a number (between 48-57 in ASCII)?
-  cmp	AL, 48			    ; is it less than 48?
-  jl	_invalidInput
+    cmp	AL, 57			    ; is it more than 57?
+    jg	_invalidInput
 
-  cmp	AL, 57			    ; is it more than 57?
-  jg	_invalidInput
+    ; passed validation. Char is a number's ASCII code
+    jmp _validInput		    
 
-  jmp _validInput		    ; passed validation. Char is a number's ASCII code
+    _invalidInput:
+      mov	EDX, [EBP+16]   ; print invalid error message
+      call	WriteString
+      jmp	_getUserString  ; go all the way back to square 1 and _getUserString afresh
 
-  _invalidInput:
-  mov	EDX, [EBP+16]	    ; print invalid error message
-  call	WriteString
-  jmp	_getUserString      ; go all the way back to square 1 and _getUserString afresh
-
-  _validInput:
-  ; ASCII value is for an integer
-  ; Convert ascii value, append it, and loop to next char  
-  ; convert via: finalInteger = 10 * finalInteger + (asciiValue - 48)
-    ; AL = asciiValue of next char of userString
-    ; EBX = finalInteger
-  ; EBX = EBX * 10 + (AL - 48)
+    _validInput:
+    ; ASCII value is for an integer
+    ; Convert ascii value, append it, and loop to next char  
+    ;   convert via: finalInteger = 10 * finalInteger + (asciiValue - 48)
   
-  sub	AL, 48		        ; AL - 48 (aka, nextDigit to add)
-  mov	DL, AL
+    sub	 AL, 48		        ; AL - 48 (expresses next digit to add)
+    mov	 DL, AL
   
-  push	EAX				    ; save EAX
-  mov	EAX, 10
-  push	EDX				    ; preserve temp EDX for mul
-  imul	EBX				    ; EAX = EBX * 10
+    push EAX			    ; preserve EAX for IMUL
+    mov	 EAX, 10
+    push EDX			    ; preserve EDX for IMUL
+    imul EBX			    ; EAX = EBX * 10
 
-  ; VALIDATE: IMUL increases total, so make sure result fits in 32-bit signed reg/mem
-  jc    _invalidInput
-  jo    _invalidInput
+    ; VALIDATE: IMUL increases total, so make sure result fits in SDWORD
+    jc    _invalidInput
+    jo    _invalidInput
 
-  mov	EBX, EAX		    ; EBX = EAX
-  pop	EDX				    ; restore EDX after mul
-  pop	EAX				    ; restore EAX
+    mov	  EBX, EAX		    
+    pop	  EDX				    ; restore EDX after IMUL
+    pop	  EAX				    ; restore EAX after IMUL
 
-  push	EBX
-  movzx EBX, DL
-  mov   EDX, EBX		    
-  pop	EBX
-  add	EBX, EDX		    
+    push  EBX
+    movzx EBX, DL
+    mov   EDX, EBX		    
+    pop	  EBX
+    add	  EBX, EDX		    
 
-  ; VALIDATE: ADD increases total at LSB, so make sure result fits in 32-bit signed reg/mem
-  jc    _carryOverflow
-  jo    _carryOverflow
-  jmp   _maintainLoop
+    ; VALIDATE: ADD increases total, so make sure result fits in SDWORD
+    jc    _carryOverflow
+    jo    _carryOverflow
+    jmp   _maintainLoop
 
-  _carryOverflow:
-    cmp   isNegative, 1     ; compare isNegative to 1 (true)
-    jne   _invalidInput     ; negative limit gets one more chance for the edge case of -2^31
+    _carryOverflow:
+      cmp   isNegative, 1     ; compare isNegative to 1 (true)
+      jne   _invalidInput     ; negative limit gets one more chance for the edge case of -2^31
 
-    cmp   DL, 8             ; is the final digit an 8 (which is the final digit of -2^31)?
-    je   _maintainLoop
+      cmp   DL, 8             ; is the final digit an 8 (which is the final digit of -2^31)?
+      je   _maintainLoop
 
-    jmp _invalidInput       ; value isn't -2^31, so now it fails validation
+      jmp _invalidInput       ; value isn't -2^31, so now it fails validation
 
-  _maintainLoop:
-    cld					    ; iterate left to right
-    lodsb				    ; MOV AL, [ESI] then inc ESI
+    _maintainLoop:
+      cld					  
+      lodsb				      ; MOV AL, [ESI] then inc ESI
 
-  loop _buildInt
+      loop _buildInt
 
-  ; if isNegative, subtract value (EBX) from 0
+  ; if isNegative, negate value (in EBX)
   cmp   isNegative, 1       ; compare isNegative to 1 (true)
   jne	_saveAsUserInt	    ; nothing to do here if not equal--it's positive!
 
@@ -714,17 +714,17 @@ ReadVal PROC
 
   _saveAsUserInt:
   ; save finalInteger as userInt
-  mov	EDI, [EBP+28]       ; EDI = OFFSET userInt
+  mov	EDI, [EBP+28]       
   mov	[EDI], EBX		    ; userInt = EBX
 
-  ; save the number of digits in this number
+  ; record the number of digits in userInt
   push  EAX
   mov   EAX, [EBP+24]       ; EAX = OFFSET charsEntered
   mov   EBX, [EAX]          ; digitCount = charsEntered
   mov   digitCount, EBX
   cmp   hasSign, 1          ; compare hasSign to 1 (true)
   pop   EAX
-  jne   _saveDigitCount     ; if hasSign, decrement digit count before saving (to not include the sign)
+  jne   _saveDigitCount     ; if hasSign, decrement digit count before saving (to exclude the sign)
   
   dec   digitCount
 
