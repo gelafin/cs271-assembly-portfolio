@@ -568,10 +568,11 @@ ReadVal PROC
   push	EAX				    ; save EAX
   mov	EAX, 10
   push	EDX				    ; preserve temp EDX for mul
-  mul	EBX				    ; EAX = EBX * 10
+  imul	EBX				    ; EAX = EBX * 10
 
-  ; VALIDATE: MUL increases total, so make sure result fits in 32-bit reg/mem
+  ; VALIDATE: IMUL increases total, so make sure result fits in 32-bit signed reg/mem
   jc    _invalidInput
+  jo    _invalidInput
 
   mov	EBX, EAX		    ; EBX = EAX
   pop	EDX				    ; restore EDX after mul
@@ -583,13 +584,19 @@ ReadVal PROC
   pop	EBX
   add	EBX, EDX		    
 
-  ; VALIDATE: ADD increases total at LSB, so make sure result fits in 32-bit reg/mem
-  jc    _carryIsSet
+  ; VALIDATE: ADD increases total at LSB, so make sure result fits in 32-bit signed reg/mem
+  jc    _carryOverflow
+  jo    _carryOverflow
   jmp   _maintainLoop
 
-  _carryIsSet:
-    cmp   DL, 8             ; this checks for the edge case of -2^31 TODO:* allows numbers past -2^31. Should also only allow the 8 in last digit if isNegative, so add that check
-    jne   _invalidInput
+  _carryOverflow:
+    cmp   isNegative, 1     ; compare isNegative to 1 (true)
+    jne   _invalidInput     ; negative limit gets one more chance for the edge case of -2^31
+
+    cmp   DL, 8             ; is the final digit an 8 (which is the final digit of -2^31)?
+    je   _maintainLoop
+
+    jmp _invalidInput       ; value isn't -2^31, so now it fails validation
 
   _maintainLoop:
     cld					    ; iterate left to right
