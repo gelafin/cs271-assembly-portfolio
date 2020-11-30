@@ -190,7 +190,7 @@ ENDM
 header			BYTE	"PROGRAMMING ASSIGNMENT 6: Designing low-level I/O procedures",10,13
 				BYTE	"Programmed by Mark Mendez",10,13,10,13,0									
 intro			BYTE	"Please provide 10 signed decimal integers.",10,13							; instructions and explanation of program
-				BYTE	"Each number needs to be small enough to fit inside a 32 bit register."
+				BYTE	"Each number needs to be small enough to fit inside a 32 bit register. "
 				BYTE	"After you have finished inputting the raw numbers I will display a "
 				BYTE	"list of the integers, their sum, and their average value.",10,13,10,13,0
 
@@ -222,6 +222,14 @@ thanks			BYTE	"Thanks for playing! I had so much fun",0
 
 .code
 main PROC
+  ; print header
+  mov  EDX, OFFSET header
+  call WriteString
+
+  ; print intro
+  mov  EDX, OFFSET intro
+  call WriteString
+
   ; get 10 valid inputs
   mov  ECX, TESTCOUNT
   mov  EDI, OFFSET userInts
