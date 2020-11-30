@@ -484,29 +484,26 @@ sumArray ENDP
 ; ---------------------------------------------------------------------------------
 ; Name: WriteVal
 ;
-; prints a given integer to the terminal
+; Prints a given integer to the terminal
 ;
 ; Preconditions: 
-;   integer is validated
+;   integer fits in an SDWORD
 ;   all elements of userStringOut are clear
 ;
 ; Postconditions:
 ;	userStringOut = reference to a string of ASCII codes representing the given integer
 ;
 ; Receives:
-;   [ebp+8]  SDWORD = integer to print (32 bits or fewer)
-;	[ebp+12] DWORD  = OFFSET digitsEntered: number of digits in integer to print
-;	[ebp+16] DWORD  = OFFSET userStringOut
-;   [ebp+20] DWORD  = OFFSET negativeSign: memory location of ascii code of negative sign
-;   [ebp+24] DWORD  = OFFSET string2EXP31
+;   [ebp+8]  = integer:              SDWORD integer to print
+;	[ebp+12] = OFFSET digitsEntered: address of DWORD number of digits in integer
+;	[ebp+16] = OFFSET userStringOut: address of string to store string version of integer
+;   [ebp+20] = OFFSET negativeSign:  address of string representing the negative sign
+;   [ebp+24] = OFFSET string2EXP31:  address of string representing -2^31 written out
 ;
 ; ---------------------------------------------------------------------------------
 WriteVal PROC
-  local isNe:BYTE
-  ; local directive executes...
-  ;   push	EBP
-  ;   mov	EBP, ESP
-
+  push	EBP
+  mov	EBP, ESP
   push	EAX
   push	EBX
   push  ECX
@@ -517,44 +514,45 @@ WriteVal PROC
   ; special treatment for -2^31, which causes overflow during NEG
   mov   EAX, [EBP+8]
   cmp   EAX, -2147483648
-  jne   _checkNegative                    ; if it's not that value, continue to next check
-  mov   EDI, [EBP+16]                     ; EDI = OFFSET userStringOut
-  mov   ESI, [EBP+24]
-  mov   ECX, 10                           ; prepare rep movsb: 10 digits in -2^31
-  rep   movsb                             ; userStringOut array = "-2,147,483,648",0
+  jne   _checkNegative                      ; if it's not -2^31, continue to next check
+  mov   EDI, [EBP+16]                     
+  mov   ESI, [EBP+24]                     
+  mov   ECX, 10                             ; prepare rep movsb: 10 digits in -2^31
+  rep   movsb                               ; userStringOut array = "-2,147,483,648",0
   jmp   _printString
 
   _checkNegative:
   ; check if userInt is negative
   mov   EAX, [EBP+8]
   cmp   EAX, 0
-  jge   _numberIsPositive	              ; number is positive! Move on and convert to string
+  jge   _numberIsPositive	                ; number is positive! Move on and convert to string
 
-  ; number is negative; undo processing from earlier and assign 2's comp to EAX
+  ; else, number is negative; reverse processing from ReadVal
   ; print a negative sign
-  mov	EDX, [EBP+20]		              ; EDX = (ascii for "-")
+  mov	EDX, [EBP+20]		              
   call	WriteString
 
   ; convert negative number to positive
-  mov   EAX, [EBP+8]                      ; EAX = abs(userInt)
+  mov   EAX, [EBP+8]                        
   neg   EAX                               
 
   ; skip numberIsPositive section
   jmp _convertToString
 
-  ; else, it's already positive, so assign directly to EAX
   _numberIsPositive:
-  mov   EAX, [EBP+8]		              ; EAX = the first number to divide
+  ; number is already positive, so assign directly to EAX
+  mov   EAX, [EBP+8]		                ; EAX = the first number to divide
 
   _convertToString:
+  ; convert user integer to string of ASCII codes
   push  ESI
   mov   ESI, [EBP+12]
-  mConvertIntToString EAX, [EBP+16], [ESI]   ; convertIntToString(userInt, OFFSET userStringOut, digitsEntered)
+  mConvertIntToString EAX, [EBP+16], [ESI]  ; mConvertIntToString(integer, OFFSET userStringOut, digitsEntered)
   pop   ESI
 
   _printString:
   ; print the string
-  mDisplayString [EBP+16]                 ; mDisplayString(OFFSET userStringOut)
+  mDisplayString [EBP+16]                   ; mDisplayString(OFFSET userStringOut)
 
   pop	EDI
   pop   ESI
@@ -562,7 +560,7 @@ WriteVal PROC
   pop	ECX
   pop	EBX
   pop	EAX
-  ; local directive executes: pop	EBP
+  pop	EBP
   ret   20
 WriteVal ENDP
 
