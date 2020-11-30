@@ -107,7 +107,7 @@ mConvertIntToString MACRO userInt:REQ, userStringOutOffset:REQ, digitsEntered:RE
 ENDM
 
 mGetDigitCount MACRO integer:REQ, digitCountOffset:REQ
-    LOCAL _countDigitsOfNegative, _countDigitsOfPositive, _gotDigitCount, digits  
+    LOCAL _countDigitsOfNegative, _countDigitsOfPositive, _gotDigitCount, _notSpecial, digits  
   .data
     digits  DWORD   0
   .code
@@ -116,6 +116,12 @@ mGetDigitCount MACRO integer:REQ, digitCountOffset:REQ
     push ECX
     push EDI
 
+    cmp   userInt, -2147483648             ; special treatment for the number that doesn't compare to zero properly
+    jne   _notSpecial
+    mov   digits, 10
+    jmp   _gotDigitCount
+
+    _notSpecial:
     mov  ECX, 10                           ; maximum of 10 digits in a 32-bit mem
     mov  digits, 1                         ; sum guaranteed to have at least 1 digit
     mov  EAX, -9                           ; comparator (changed to start at 9 for positive sum)
@@ -147,6 +153,8 @@ mGetDigitCount MACRO integer:REQ, digitCountOffset:REQ
       mov  EBX, 10                          ; add a 9 digit to comparator (multiply by 10 and sub 9)
       mul  EBX
       sub  EAX, 9
+
+      loop _countDigitsOfNegative
 
     _gotDigitCount:
       ; return the digit count
@@ -198,6 +206,7 @@ charLengths  	DWORD	TESTCOUNT DUP(?)															; how many characters long ea
 digitsEntered   DWORD   ?                                                                           ; holds a given value of charLengths for testing
 userInts        SDWORD  TESTCOUNT DUP(?)                                                            ; used for testing
 separator       BYTE    ", ",0
+string2EXP31    BYTE    "-2147483648",0
 
 negativeSign    BYTE    45,0
 userStringOut	BYTE	MAXSIZE DUP(?)
@@ -260,6 +269,7 @@ main PROC
     pop  EAX
 
     ; convert userInt to ASCII string and print
+    push OFFSET string2EXP31
     push OFFSET negativeSign
     push EDI                               ; EDI == OFFSET userStringOut
     push OFFSET digitsEntered                     ; already accounts for not including sign
@@ -294,6 +304,7 @@ main PROC
   mov  EDX, OFFSET theSumIs
   call WriteString
 
+  push OFFSET string2EXP31
   push OFFSET negativeSign
   push OFFSET userStringOut
   push OFFSET digitsEntered              ; obtained above in mGetDigitCount
@@ -319,6 +330,7 @@ main PROC
   mov  EDX, OFFSET theAvgIs
   call WriteString
 
+  push OFFSET string2EXP31
   push OFFSET negativeSign
   push OFFSET userStringOut               ; TODO:* need to clear? Yes
   push OFFSET digitsEntered               ; obtained above in mGetDigitCount
@@ -404,6 +416,7 @@ sumArray ENDP
 ;	[ebp+12] DWORD  = OFFSET digitsEntered: number of digits in integer to print
 ;	[ebp+16] DWORD  = OFFSET userStringOut
 ;   [ebp+20] DWORD  = OFFSET negativeSign: memory location of ascii code of negative sign
+;   [ebp+24] DWORD  = OFFSET string2EXP31
 ;
 ; ---------------------------------------------------------------------------------
 WriteVal PROC
@@ -419,8 +432,20 @@ WriteVal PROC
   push  ESI
   push	EDI
 
+  ; special treatment for -2^31, which causes overflow during NEG
+  mov   EAX, [EBP+8]
+  cmp   EAX, -2147483648
+  jne   _checkNegative                    ; if it's not that value, continue to next check
+  mov   EDI, [EBP+16]                     ; EDI = OFFSET userStringOut
+  mov   ESI, [EBP+24]
+  mov   ECX, 10                           ; prepare rep movsb: 10 digits in -2^31
+  rep   movsb                             ; userStringOut array = "-2,147,483,648",0
+  jmp   _printString
+
+  _checkNegative:
   ; check if userInt is negative
-  cmp   userInt, 0
+  mov   EAX, [EBP+8]
+  cmp   EAX, 0
   jge   _numberIsPositive	              ; number is positive! Move on and convert to string
 
   ; number is negative; undo processing from earlier and assign 2's comp to EAX
@@ -428,21 +453,16 @@ WriteVal PROC
   mov	EDX, [EBP+20]		              ; EDX = (ascii for "-")
   call	WriteString
 
-  ; convert negative number to positive by subtracting from 0 TODO: need to use 0 - QWORD mem operand, not register. Asked about SBB
-  ; if no SBB, make an absoluteValue proc to... 
-  ;   1. apply two's comp (invert bits, then add 1)
-  ;   2. clear the first bit and read back as a number
-
-  mov   EAX, 0      		              ; EAX = 0
-  mov   EBX, [EBP+8]                      ; EBX = userInt
-  sub   EAX, EBX                          ; EAX = 0 - userInt
+  ; convert negative number to positive
+  mov   EAX, [EBP+8]                      ; EAX = abs(userInt)
+  neg   EAX                               
 
   ; skip numberIsPositive section
   jmp _convertToString
 
   ; else, it's already positive, so assign directly to EAX
   _numberIsPositive:
-  mov   EAX, [EBP+8]		    ; EAX = the first number to divide
+  mov   EAX, [EBP+8]		              ; EAX = the first number to divide
 
   _convertToString:
   push  ESI
@@ -450,6 +470,7 @@ WriteVal PROC
   mConvertIntToString EAX, [EBP+16], [ESI]   ; convertIntToString(userInt, OFFSET userStringOut, digitsEntered)
   pop   ESI
 
+  _printString:
   ; print the string
   mDisplayString [EBP+16]                 ; mDisplayString(OFFSET userStringOut)
 
@@ -460,7 +481,7 @@ WriteVal PROC
   pop	EBX
   pop	EAX
   ; local directive executes: pop	EBP
-  ret   16
+  ret   20
 WriteVal ENDP
 
 ; ---------------------------------------------------------------------------------
@@ -609,11 +630,7 @@ ReadVal PROC
   jne	_saveAsUserInt	    ; nothing to do here if not equal--it's positive!
 
   ; number should be negative, so negate value
-  push	EAX
-  mov	EAX, 0
-  sub	EAX, EBX		    ; EAX = 0 - EBX
-  mov	EBX, EAX		    ; EBX = EAX
-  pop   EAX
+  neg   EBX
 
   _saveAsUserInt:
   ; save finalInteger as userInt
