@@ -278,15 +278,13 @@ main PROC
 ; Print header
 ;
 ; --------------------------
-  mov  EDX, OFFSET header
-  call WriteString
+  mDisplayString OFFSET header
 
 ; --------------------------
 ; Print intro
 ;
 ; --------------------------
-  mov  EDX, OFFSET intro
-  call WriteString
+  mDisplayString OFFSET intro
 
 ; --------------------------
 ; Test ReadVal by interacting with user to get some (TESTCOUNT) integers.
@@ -329,8 +327,7 @@ main PROC
 ;
 ; --------------------------
   call CrLf
-  mov  EDX, OFFSET youEntered
-  call WriteString
+  mDisplayString OFFSET youEntered
 
   ; prepare for loop
   mov  ESI, OFFSET userInts
@@ -357,8 +354,7 @@ main PROC
     ; print a separator (e.g., comma and space) unless it's the last element
     cmp  ECX, 1
     je   _noSeparator
-    mov  EDX, OFFSET separator
-    call WriteString
+    mDisplayString OFFSET separator
 
     _noSeparator:
       ; maintain test loop
@@ -382,8 +378,7 @@ main PROC
   ; print the sum
   call CrLf
   call CrLf
-  mov  EDX, OFFSET theSumIs
-  call WriteString
+  mDisplayString OFFSET theSumIs
 
   push OFFSET string2EXP31
   push OFFSET negativeSign
@@ -399,7 +394,7 @@ main PROC
   mov  EAX, sum
   mov  EBX, TESTCOUNT
   cdq
-  idiv  EBX
+  idiv EBX
   mov  average, EAX                       ; average = sum // TESTCOUNT
 
   ; get digit count of average
@@ -411,8 +406,7 @@ main PROC
   ; print average
   call CrLf
   call CrLf
-  mov  EDX, OFFSET theAvgIs
-  call WriteString
+  mDisplayString OFFSET theAvgIs
 
   push OFFSET string2EXP31
   push OFFSET negativeSign
