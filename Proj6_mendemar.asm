@@ -1,7 +1,7 @@
 TITLE "String Primitives and Macros"     (Proj6_mendemar.asm)
 
 ; Author: Mark Mendez
-; Last Modified: 11/29/2020
+; Last Modified: 12/4/2020
 ; OSU email address: mendemar@oregonstate.edu
 ; Course number/section: CS271 Section 400
 ; Project Number: 6                Due Date: 12/6/2020
